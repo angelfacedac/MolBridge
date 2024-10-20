@@ -61,12 +61,14 @@ def train(model, dataloader, loss_fn, opt, epoch, writer):
     model.train()
     batch = 0
     sum_loss = 0
+    sum_L1 = 0
     for data in dataloader:
         batch += 1
         all_batch += 1
         embeds, adjs, masks, cnn_masks, targets = data
-        P, _ = model(embeds, adjs, masks, cnn_masks)
-        loss = loss_fn(P, targets)
+        P, _, L1 = model(embeds, adjs, masks, cnn_masks)
+        loss = loss_fn(P, targets) + L1 * args.k
+        sum_L1 += L1
         # print(f"第 {batch} 批训练loss:  {loss.item()}")
         writer.add_scalar(f"train_loss ( all_batch )", loss.item(), all_batch)
 
@@ -76,7 +78,9 @@ def train(model, dataloader, loss_fn, opt, epoch, writer):
         loss.backward()
         opt.step()
 
-    print(f"第 {epoch} 轮训练loss:  {sum_loss}")
+    print(f"第 {epoch} 轮训练sumLoss:  {sum_loss}")
+    print(f"第 {epoch} 轮训练L1loss:  {sum_L1}")
+    print(f"第 {epoch} 轮训练loss:  {sum_loss-sum_L1 * args.k}")
     writer.add_scalar("train_loss", sum_loss, epoch)
 
 
@@ -101,8 +105,8 @@ def valida(model, dataloader, loss_fn, epoch, writer, two_class=False):
         y_prob = []
         for data in dataloader:
             embeds, adjs, masks, cnn_masks, targets = data
-            P, _ = model(embeds, adjs, masks, cnn_masks)
-            loss = loss_fn(P, targets)
+            P, _, L1 = model(embeds, adjs, masks, cnn_masks)
+            loss = loss_fn(P, targets) + L1
 
             sum_loss += loss.item()
             y_true += targets.int().cpu().tolist()
@@ -213,7 +217,7 @@ def test(checkpoint_path, test_dataloader, epoch=None, writer=None, two_class=Fa
             y_prob = []
             for data in test_dataloader:
                 embeds, adjs, masks, cnn_masks, targets = data
-                P, _ = model(embeds, adjs, masks, cnn_masks)
+                P, _, L1 = model(embeds, adjs, masks, cnn_masks)
 
                 y_true += targets.int().cpu().tolist()
                 y_pred += (nn.functional.sigmoid(P) > 0.5).int().cpu().tolist()
@@ -261,7 +265,7 @@ def test(checkpoint_path, test_dataloader, epoch=None, writer=None, two_class=Fa
             y_pred = []
             for data in test_dataloader:
                 embeds, adjs, masks, cnn_masks, targets = data
-                P, _ = model(embeds, adjs, masks, cnn_masks)
+                P, _, L1 = model(embeds, adjs, masks, cnn_masks)
 
                 y_true += targets.int().cpu().tolist()
                 y_pred += torch.argmax(P, dim=1).int().cpu().tolist()

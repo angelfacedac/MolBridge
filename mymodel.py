@@ -17,6 +17,7 @@ class MyModel(nn.Module):
             nn.Dropout(p=args.dropout),
             nn.Linear(in_features=args.mlp_hid_dim, out_features=args.n_class)
         )
+        self.loss = nn.MSELoss(reduction='sum')
 
     def gnn_message_passing(self, adj, embeds):
         return torch.bmm(adj, embeds)  # 批量矩阵乘法，只适用于稠密矩阵
@@ -29,25 +30,28 @@ class MyModel(nn.Module):
         :param cnn_mask: (batch, n_atom, n_atom), embeds = cnn_mask * embeds, 0 or 1
         :return:
         """
+        L1 = 0
         history_embeds = [embeds]
         for i in range(args.block_num):
-            embeds = embeds.permute(0, 2, 1)
-            embeds = self.conv1d_trans(embeds)
-            embeds = embeds.permute(0, 2, 1)
-            embeds = torch.bmm(cnn_mask, embeds)
-            embeds = self.gnn_message_passing(adj, embeds)
-            embeds = self.transformer_encoder(embeds, src_key_padding_mask=mask)
+            output, attn_weights = self.transformer_encoder.self_attn(
+                embeds, embeds, embeds, attn_mask=None, key_padding_mask=mask, need_weights=True
+            )
+            attn_weights = torch.bmm(cnn_mask, attn_weights)
+            embeds = self.gnn_message_passing(attn_weights, embeds)
+            L1 += self.loss(adj[:args.clip_n_atom, :args.clip_n_atom], attn_weights[:args.clip_n_atom, :args.clip_n_atom])
+            L1 += self.loss(adj[args.clip_n_atom:, args.clip_n_atom:], attn_weights[args.clip_n_atom:, args.clip_n_atom:])
             history_embeds.append(embeds)
 
         embeds = sum(history_embeds)
         del history_embeds
 
+        embeds = torch.bmm(cnn_mask, embeds)
         embeds = torch.sum(embeds, dim=1)
 
         P = self.mlp(embeds)
         P = P.squeeze()
 
-        return P, embeds
+        return P, embeds, L1/3
 
 
 if __name__ == '__main__':
@@ -59,4 +63,3 @@ if __name__ == '__main__':
     model.train()
     ans = model(embeds, adj, mask, cnn_mask)
     print(ans)
-    print(ans.size())
