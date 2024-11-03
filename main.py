@@ -46,10 +46,15 @@ def init_model_and_tools():
     log_root_path = os.path.join("Out", f"{logdir_name}", f"{args.root_path[5] + str(k)}")
     writer = SummaryWriter(os.path.join(log_root_path, "tensorboard"))
     params_path = os.path.join(log_root_path, "params.txt")
+    mymodel_path = os.path.join(log_root_path, "model.txt")
     checkpoint_path = os.path.join(log_root_path, "checkpoint")
     with open("Params.py", 'r', encoding='utf-8') as py_file:
         content = py_file.read()
     with open(params_path, 'w', encoding='utf-8') as txt_file:
+        txt_file.write(content)
+    with open("mymodel.py", 'r', encoding='utf-8') as py_file:
+        content = py_file.read()
+    with open(mymodel_path, 'w', encoding='utf-8') as txt_file:
         txt_file.write(content)
 
     return model, loss_fn, opt, writer, checkpoint_path
@@ -80,7 +85,7 @@ def train(model, dataloader, loss_fn, opt, epoch, writer):
 
     print(f"第 {epoch} 轮训练sumLoss:  {sum_loss}")
     print(f"第 {epoch} 轮训练L1loss:  {sum_L1}")
-    print(f"第 {epoch} 轮训练loss:  {sum_loss-sum_L1 * args.k}")
+    print(f"第 {epoch} 轮训练loss:  {sum_loss - sum_L1 * args.k}")
     writer.add_scalar("train_loss", sum_loss, epoch)
 
 
@@ -94,7 +99,7 @@ def save_checkpoint(checkpoint_path, model, opt, epoch):
     print(f"第 {epoch} 轮checkpoint已保存")
 
 
-def valida(model, dataloader, loss_fn, epoch, writer, two_class=False):
+def valida(model, dataloader, loss_fn, epoch, writer, ACC_list, F1_list, two_class=False):
     print(f"----------第 {epoch} 轮验证开始-----------")
     # 验证模型
     model.eval()
@@ -110,8 +115,10 @@ def valida(model, dataloader, loss_fn, epoch, writer, two_class=False):
 
             sum_loss += loss.item()
             y_true += targets.int().cpu().tolist()
-            if two_class: y_pred += (nn.functional.sigmoid(P) > 0.5).int().cpu().tolist()
-            else: y_pred += torch.argmax(P, dim=1).int().cpu().tolist()
+            if two_class:
+                y_pred += (nn.functional.sigmoid(P) > 0.5).int().cpu().tolist()
+            else:
+                y_pred += torch.argmax(P, dim=1).int().cpu().tolist()
             y_prob += P.cpu().tolist()
 
         print(f"第 {epoch} 轮验证loss:  {sum_loss}")
@@ -145,7 +152,7 @@ def valida(model, dataloader, loss_fn, epoch, writer, two_class=False):
 
             # 计算混淆矩阵
             conf_matrix = confusion_matrix(y_true, y_pred)
-            print("Confusion Matrix:\n", conf_matrix)
+            # print("Confusion Matrix:\n", conf_matrix)
 
             # 日志
             writer.add_scalar("val AUC", auc_score, epoch)
@@ -165,8 +172,8 @@ def valida(model, dataloader, loss_fn, epoch, writer, two_class=False):
             macro_f1_score = report['macro avg']['f1-score']
 
             # 打印宏平均指标
-            print(
-                f"Macro Avg - Precision: {macro_precision:.2f}, Recall: {macro_recall:.2f}, F1-Score: {macro_f1_score:.2f}")
+            # print(
+            #     f"Macro Avg - Precision: {macro_precision:.2f}, Recall: {macro_recall:.2f}, F1-Score: {macro_f1_score:.2f}")
 
             # 访问加权平均 (weighted avg) 的指标
             weighted_precision = report['weighted avg']['precision']
@@ -174,15 +181,15 @@ def valida(model, dataloader, loss_fn, epoch, writer, two_class=False):
             weighted_f1_score = report['weighted avg']['f1-score']
 
             # 打印加权平均指标
-            print(
-                f"Weighted Avg - Precision: {weighted_precision:.2f}, Recall: {weighted_recall:.2f}, F1-Score: {weighted_f1_score:.2f}")
+            # print(
+            #     f"Weighted Avg - Precision: {weighted_precision:.2f}, Recall: {weighted_recall:.2f}, F1-Score: {weighted_f1_score:.2f}")
 
             # 使用 precision_recall_fscore_support 计算微平均
             micro_precision, micro_recall, micro_f1_score, _ = precision_recall_fscore_support(y_true, y_pred,
                                                                                                average='micro')
 
-            print(
-                f"Micro Avg - Precision: {micro_precision:.2f}, Recall: {micro_recall:.2f}, F1-Score: {micro_f1_score:.2f}")
+            # print(
+            #     f"Micro Avg - Precision: {micro_precision:.2f}, Recall: {micro_recall:.2f}, F1-Score: {micro_f1_score:.2f}")
 
             # 计算准确率
             accuracy = accuracy_score(y_true, y_pred)
@@ -200,13 +207,25 @@ def valida(model, dataloader, loss_fn, epoch, writer, two_class=False):
             writer.add_scalar("val Micro F1", micro_f1_score, epoch)
             writer.add_scalar("val Accuracy", accuracy, epoch)
 
+            ACC_list.append((-accuracy, epoch))
+            F1_list.append((-macro_f1_score, epoch))
 
-def test(checkpoint_path, test_dataloader, epoch=None, writer=None, two_class=False):
-    print(f"---------------模型 {checkpoint_path} 测试开始-------------------")
+
+#  checkpoint_path = os.path.join(checkpoint_path, f"{epoch:03d}.pth")
+def get_model_by_checkpoint(checkpoint_path):
     checkpoint = torch.load(checkpoint_path)
     model = MyModel()
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(args.device)
+    return model
+
+
+def test(model, test_dataloader, epoch=None, writer=None, two_class=False, ACC_list=None, F1_list=None):
+    print(f"---------------模型测试开始-------------------")
+    # checkpoint = torch.load(checkpoint_path)
+    # model = MyModel()
+    # model.load_state_dict(checkpoint["model_state_dict"])
+    # model.to(args.device)
 
     model.eval()
     with torch.no_grad():
@@ -250,7 +269,7 @@ def test(checkpoint_path, test_dataloader, epoch=None, writer=None, two_class=Fa
 
             # 计算混淆矩阵
             conf_matrix = confusion_matrix(y_true, y_pred)
-            print("Confusion Matrix:\n", conf_matrix)
+            # print("Confusion Matrix:\n", conf_matrix)
 
             # 日志
             if writer:
@@ -279,8 +298,8 @@ def test(checkpoint_path, test_dataloader, epoch=None, writer=None, two_class=Fa
             macro_f1_score = report['macro avg']['f1-score']
 
             # 打印宏平均指标
-            print(
-                f"Macro Avg - Precision: {macro_precision:.2f}, Recall: {macro_recall:.2f}, F1-Score: {macro_f1_score:.2f}")
+            # print(
+            #     f"Macro Avg - Precision: {macro_precision:.2f}, Recall: {macro_recall:.2f}, F1-Score: {macro_f1_score:.2f}")
 
             # 访问加权平均 (weighted avg) 的指标
             weighted_precision = report['weighted avg']['precision']
@@ -288,13 +307,15 @@ def test(checkpoint_path, test_dataloader, epoch=None, writer=None, two_class=Fa
             weighted_f1_score = report['weighted avg']['f1-score']
 
             # 打印加权平均指标
-            print(
-                f"Weighted Avg - Precision: {weighted_precision:.2f}, Recall: {weighted_recall:.2f}, F1-Score: {weighted_f1_score:.2f}")
+            # print(
+            #     f"Weighted Avg - Precision: {weighted_precision:.2f}, Recall: {weighted_recall:.2f}, F1-Score: {weighted_f1_score:.2f}")
 
             # 使用 precision_recall_fscore_support 计算微平均
-            micro_precision, micro_recall, micro_f1_score, _ = precision_recall_fscore_support(y_true, y_pred, average='micro')
+            micro_precision, micro_recall, micro_f1_score, _ = precision_recall_fscore_support(y_true, y_pred,
+                                                                                               average='micro')
 
-            print(f"Micro Avg - Precision: {micro_precision:.2f}, Recall: {micro_recall:.2f}, F1-Score: {micro_f1_score:.2f}")
+            # print(
+            #     f"Micro Avg - Precision: {micro_precision:.2f}, Recall: {micro_recall:.2f}, F1-Score: {micro_f1_score:.2f}")
 
             # 计算准确率
             accuracy = accuracy_score(y_true, y_pred)
@@ -313,9 +334,17 @@ def test(checkpoint_path, test_dataloader, epoch=None, writer=None, two_class=Fa
                 writer.add_scalar("test Micro F1", micro_f1_score, epoch)
                 writer.add_scalar("test Accuracy", accuracy, epoch)
 
+                ACC_list.append((-accuracy, epoch))
+                F1_list.append((-macro_f1_score, epoch))
+
 
 def main():
     global all_batch
+
+    ACC_list_val = []
+    F1_list_val = []
+    ACC_list_test = []
+    F1_list_test = []
 
     train_dataloader, val_dataloader, test_dataloader = init_data(kth_split=k)
 
@@ -324,7 +353,7 @@ def main():
     all_batch = 0
 
     for i in range(args.epoch):
-        epoch = i+1
+        epoch = i + 1
         print(f"----------第 {epoch} 轮训练开始-----------")
         train(
             model=model,
@@ -334,32 +363,57 @@ def main():
             epoch=epoch,
             writer=writer
         )
-        save_checkpoint(
-            checkpoint_path=checkpoint_path,
-            model=model,
-            opt=opt,
-            epoch=epoch
-        )
+        if epoch % 50 == 0:
+            save_checkpoint(
+                checkpoint_path=checkpoint_path,
+                model=model,
+                opt=opt,
+                epoch=epoch
+            )
         valida(
             model=model,
             dataloader=val_dataloader,
             loss_fn=loss_fn,
             epoch=epoch,
             writer=writer,
-            two_class=False
+            two_class=False,
+            ACC_list=ACC_list_val,
+            F1_list=F1_list_val
         )
         test(
-            checkpoint_path=os.path.join(checkpoint_path, f"{epoch:03d}.pth"),
+            model=model,
             test_dataloader=test_dataloader,
             epoch=epoch,
             writer=writer,
-            two_class=False
+            two_class=False,
+            ACC_list=ACC_list_test,
+            F1_list=F1_list_test
         )
-        writer.close()
+
+    writer.close()
+
+    ACC_list_val.sort()
+    F1_list_val.sort()
+    ACC_list_test.sort()
+    F1_list_test.sort()
+
+    with open(os.path.join(checkpoint_path, "result.txt"), 'w') as file:
+        for vec, flag in [(ACC_list_val, "ACC_val"),
+                          (F1_list_val, "F1_val"),
+                          (ACC_list_test, "ACC_test"),
+                          (F1_list_test, "F1_test")]:
+            text = ""
+            text_ = ""
+            for value, ansEpoch in vec[:args.epoch//50]:
+                text += f"{ansEpoch:6d}" + " "
+                text_ += f"{-value:>6.4f}" + " "
+            file.write(flag + "\n")
+            file.write(text + "\n")
+            file.write(text_ + "\n")
 
 
 if __name__ == '__main__':
     logdir_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
     for k in range(5):
         main()
-

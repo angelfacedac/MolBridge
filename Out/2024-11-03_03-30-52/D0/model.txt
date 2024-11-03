@@ -19,9 +19,7 @@ class MyModel(nn.Module):
         )
         self.loss = nn.MSELoss(reduction='sum')
 
-        self.norm1 = nn.LayerNorm(args.atom_dim)
-        self.norm2= nn.LayerNorm(args.atom_dim)
-
+        self.norm = nn.LayerNorm(args.atom_dim)
         self.ffn = nn.Sequential(
             nn.Linear(args.atom_dim, 2048),
             nn.ReLU(),
@@ -49,8 +47,8 @@ class MyModel(nn.Module):
             output, attn_weights = self.transformer_encoder.self_attn(
                 embeds, embeds, embeds, attn_mask=None, key_padding_mask=mask, need_weights=True
             )
-            embeds = self.norm1(embeds + output)
-            embeds = self.norm2(embeds + self.ffn(embeds))
+            embeds = self.norm(embeds + output)
+            embeds = self.norm(embeds + self.ffn(embeds))
             # attn_weights = torch.bmm(cnn_mask, attn_weights)
             # embeds = self.gnn_message_passing(attn_weights, embeds)
             # L1 += self.loss(adj[:args.clip_n_atom, :args.clip_n_atom], attn_weights[:args.clip_n_atom, :args.clip_n_atom])

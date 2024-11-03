@@ -1,5 +1,5 @@
 import argparse
-#
+# 测试self_attn
 
 def ParseArgs():
     parser = argparse.ArgumentParser(description='Model Params')
@@ -19,8 +19,8 @@ def ParseArgs():
     parser.add_argument('--dropout', default=0.1, type=float, help='Ratio of mlp layer dropout')
     parser.add_argument('--k', default=1, type=float, help='重构loss的系数，为了增大梯度')
 
-    parser.add_argument('--gpu', default=2, type=int, help='indicates which gpu to use')
-    parser.add_argument('--device', default='cuda:2', type=str, help='indicates which gpu to use')
+    parser.add_argument('--gpu', default=0, type=int, help='indicates which gpu to use')
+    parser.add_argument('--device', default='cuda:0', type=str, help='indicates which gpu to use')
 
     parser.add_argument('--n_class', default=65, type=int, help='number of class')
     parser.add_argument('--root_path', default="Data/Deng's dataset", type=str, help='root_path')

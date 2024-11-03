@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="linx@172.16.73.65:22 password (4)" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="linx@172.22.9.201:22 password" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="linx@172.16.72.104:22 password">
         <serverdata>
@@ -86,6 +86,13 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="linx@172.22.9.201:22 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/linx/Dac/TransGNN-DDI" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="linxuan@172.20.88.16:22">
         <serverdata>
           <mappings>
@@ -104,6 +111,13 @@
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="轩哥实验室">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/linx/Dac/TransGNN-DDI" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
