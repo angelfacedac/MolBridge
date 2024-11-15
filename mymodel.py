@@ -17,7 +17,7 @@ class MyModel(nn.Module):
             nn.Dropout(p=args.dropout),
             nn.Linear(in_features=args.mlp_hid_dim, out_features=args.n_class)
         )
-        self.loss = nn.MSELoss(reduction='sum')
+        self.loss = nn.MSELoss()
 
         self.norm1 = nn.LayerNorm(args.atom_dim)
         self.norm2= nn.LayerNorm(args.atom_dim)
@@ -41,20 +41,23 @@ class MyModel(nn.Module):
         :param cnn_mask: (batch, n_atom, n_atom), embeds = cnn_mask * embeds, 0 or 1
         :return:
         """
-        # L1 = 0
+        L1 = 0
         history_embeds = [embeds]
         for i in range(args.block_num):
-            embeds = torch.bmm(cnn_mask, embeds)
-            embeds = self.gnn_message_passing(adj, embeds)
+            # embeds = torch.bmm(cnn_mask, embeds)
+            # embeds = self.gnn_message_passing(adj, embeds)
             output, attn_weights = self.transformer_encoder.self_attn(
                 embeds, embeds, embeds, attn_mask=None, key_padding_mask=mask, need_weights=True
             )
-            embeds = self.norm1(embeds + output)
+            attn_weights = torch.bmm(cnn_mask, attn_weights)
+            L1 += self.loss(adj[:args.clip_n_atom, :args.clip_n_atom], attn_weights[:args.clip_n_atom, :args.clip_n_atom])
+            L1 += self.loss(adj[args.clip_n_atom:, args.clip_n_atom:], attn_weights[args.clip_n_atom:, args.clip_n_atom:])
+
+            embeds = self.norm1(embeds + self.gnn_message_passing(adj + attn_weights, embeds))
+
+            # embeds = self.norm1(embeds + output)
             embeds = self.norm2(embeds + self.ffn(embeds))
-            # attn_weights = torch.bmm(cnn_mask, attn_weights)
-            # embeds = self.gnn_message_passing(attn_weights, embeds)
-            # L1 += self.loss(adj[:args.clip_n_atom, :args.clip_n_atom], attn_weights[:args.clip_n_atom, :args.clip_n_atom])
-            # L1 += self.loss(adj[args.clip_n_atom:, args.clip_n_atom:], attn_weights[args.clip_n_atom:, args.clip_n_atom:])
+
             history_embeds.append(embeds)
 
         embeds = sum(history_embeds)
@@ -66,7 +69,7 @@ class MyModel(nn.Module):
         P = self.mlp(embeds)
         P = P.squeeze()
 
-        return P, embeds, 0
+        return P, embeds, L1 * 0.5 * (1./args.block_num)
 
 
 if __name__ == '__main__':

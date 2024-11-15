@@ -5,6 +5,8 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from rdkit import Chem
+from rdkit.Chem import Draw
 
 import mymodel
 from Params import args
@@ -106,7 +108,7 @@ def do_T_SNE():
     T_SNE(out_embeds, labels)
 
 
-def Vis_Cal_Graph():
+def vis_cal_graph():
     model = MyModel()
     model.eval()
     embed = torch.zeros(1, args.clip_n_atom, args.atom_dim)
@@ -122,11 +124,13 @@ def Vis_Cal_Graph():
 
     print(output)
 
-remove_checkpoint(
-    ["2024-10-21_02-12-51",
-     "2024-10-21_02-09-06",
-     "2024-10-20_03-55-24",
-     "2024-10-10_14-26-00",
-     ],
-    "D"
-)
+
+def draw_mol(smile):
+    mol = Chem.MolFromSmiles(smile)
+    img = Draw.MolToImage(mol)
+    img.show()
+    Draw.MolToFile(mol, smile+".svg")
+
+
+draw_mol("COO")
+

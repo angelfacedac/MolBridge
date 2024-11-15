@@ -72,7 +72,7 @@ def train(model, dataloader, loss_fn, opt, epoch, writer):
         all_batch += 1
         embeds, adjs, masks, cnn_masks, targets = data
         P, _, L1 = model(embeds, adjs, masks, cnn_masks)
-        loss = loss_fn(P, targets) + L1 * args.k
+        loss = loss_fn(P, targets) + L1 * args.alpha
         sum_L1 += L1
         # print(f"第 {batch} 批训练loss:  {loss.item()}")
         writer.add_scalar(f"train_loss ( all_batch )", loss.item(), all_batch)
@@ -85,8 +85,10 @@ def train(model, dataloader, loss_fn, opt, epoch, writer):
 
     print(f"第 {epoch} 轮训练sumLoss:  {sum_loss}")
     print(f"第 {epoch} 轮训练L1loss:  {sum_L1}")
-    print(f"第 {epoch} 轮训练loss:  {sum_loss - sum_L1 * args.k}")
-    writer.add_scalar("train_loss", sum_loss, epoch)
+    print(f"第 {epoch} 轮训练loss:  {sum_loss - sum_L1 * args.alpha}")
+    writer.add_scalar("train_loss_sum", sum_loss, epoch)
+    writer.add_scalar("train_loss_model", sum_loss - sum_L1 * args.alpha, epoch)
+    writer.add_scalar("train_loss_L1", sum_L1, epoch)
 
 
 def save_checkpoint(checkpoint_path, model, opt, epoch):
@@ -97,6 +99,11 @@ def save_checkpoint(checkpoint_path, model, opt, epoch):
         "optimizer_state_dict": opt.state_dict()
     }, os.path.join(checkpoint_path, f"{epoch:03d}.pth"))
     print(f"第 {epoch} 轮checkpoint已保存")
+
+
+def remove_checkpoint(checkpoint_path):
+    os.remove(checkpoint_path)
+    print(f"remove {checkpoint_path} success!")
 
 
 def valida(model, dataloader, loss_fn, epoch, writer, ACC_list, F1_list, two_class=False):
@@ -111,7 +118,7 @@ def valida(model, dataloader, loss_fn, epoch, writer, ACC_list, F1_list, two_cla
         for data in dataloader:
             embeds, adjs, masks, cnn_masks, targets = data
             P, _, L1 = model(embeds, adjs, masks, cnn_masks)
-            loss = loss_fn(P, targets) + L1
+            loss = loss_fn(P, targets) + L1 * args.alpha
 
             sum_loss += loss.item()
             y_true += targets.int().cpu().tolist()
@@ -338,6 +345,22 @@ def test(model, test_dataloader, epoch=None, writer=None, two_class=False, ACC_l
                 F1_list.append((-macro_f1_score, epoch))
 
 
+def save_best_result(checkpoint_path, ACC_list_val, F1_list_val, ACC_list_test, F1_list_test):
+    with open(os.path.join(checkpoint_path, "result.txt"), 'w') as file:
+        for vec, flag in [(ACC_list_val, "ACC_val"),
+                          (F1_list_val, "F1_val"),
+                          (ACC_list_test, "ACC_test"),
+                          (F1_list_test, "F1_test")]:
+            text = ""
+            text_ = ""
+            for value, ansEpoch in vec[:args.epoch//50]:
+                text += f"{ansEpoch:6d}" + " "
+                text_ += f"{-value:>6.4f}" + " "
+            file.write(flag + "\n")
+            file.write(text + "\n")
+            file.write(text_ + "\n")
+
+
 def main():
     global all_batch
 
@@ -363,13 +386,12 @@ def main():
             epoch=epoch,
             writer=writer
         )
-        if epoch % 50 == 0:
-            save_checkpoint(
-                checkpoint_path=checkpoint_path,
-                model=model,
-                opt=opt,
-                epoch=epoch
-            )
+        save_checkpoint(
+            checkpoint_path=checkpoint_path,
+            model=model,
+            opt=opt,
+            epoch=epoch
+        )
         valida(
             model=model,
             dataloader=val_dataloader,
@@ -397,23 +419,16 @@ def main():
     ACC_list_test.sort()
     F1_list_test.sort()
 
-    with open(os.path.join(checkpoint_path, "result.txt"), 'w') as file:
-        for vec, flag in [(ACC_list_val, "ACC_val"),
-                          (F1_list_val, "F1_val"),
-                          (ACC_list_test, "ACC_test"),
-                          (F1_list_test, "F1_test")]:
-            text = ""
-            text_ = ""
-            for value, ansEpoch in vec[:args.epoch//50]:
-                text += f"{ansEpoch:6d}" + " "
-                text_ += f"{-value:>6.4f}" + " "
-            file.write(flag + "\n")
-            file.write(text + "\n")
-            file.write(text_ + "\n")
+    save_best_result(checkpoint_path, ACC_list_val, F1_list_val, ACC_list_test, F1_list_test)
+
+    for v, epoch in F1_list_test[args.epoch//50:]:
+        remove_checkpoint(os.path.join(checkpoint_path, f"{epoch:03d}.pth"))
+
 
 
 if __name__ == '__main__':
     logdir_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # logdir_name = "2024-11-04_03-35-59"
 
     for k in range(5):
         main()
