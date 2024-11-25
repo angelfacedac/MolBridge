@@ -1,5 +1,8 @@
 import argparse
-# 加上重构图的loss，直接GNN邻接矩阵使用 adj + attn_weights
+# Mymodel 3.0
+# Ryu
+# 基于3.0，只留了block
+# 不同的block之间参数不共享
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module='sklearn.metrics._classification')
@@ -9,7 +12,7 @@ def ParseArgs():
     parser = argparse.ArgumentParser(description='Model Params')
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     parser.add_argument('--batch', default=256, type=int, help='batch size')
-    parser.add_argument('--epoch', default=5, type=int, help='number of epochs')
+    parser.add_argument('--epoch', default=500, type=int, help='number of epochs')
 
     parser.add_argument('--loss_fn', default="CrossEntropyLoss", type=str, help='BCEWithLogitsLoss, CrossEntropyLoss')
 
@@ -22,6 +25,7 @@ def ParseArgs():
     parser.add_argument('--block_num', default=3, type=int, help='number of hops in gcn precessing')
     parser.add_argument('--dropout', default=0.1, type=float, help='Ratio of mlp layer dropout')
     parser.add_argument('--alpha', default=100.0, type=float, help='重构loss的系数，为了增大梯度')
+    parser.add_argument('--adj_is_norm', default=False, type=bool, help='是否根据度矩阵正则化邻接矩阵')
 
     parser.add_argument('--gpu', default=0, type=int, help='indicates which gpu to use')
     parser.add_argument('--device', default='cuda:0', type=str, help='indicates which gpu to use')

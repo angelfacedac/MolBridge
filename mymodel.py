@@ -1,3 +1,5 @@
+import copy
+
 import torch
 from torch import nn
 from Params import args
@@ -8,7 +10,7 @@ class MyModel(nn.Module):
         super(MyModel, self).__init__()
         self.transformer_encoder = nn.TransformerEncoderLayer(d_model=args.atom_dim, nhead=args.att_head,
                                                               batch_first=True)
-        self.conv1d_trans = nn.Conv1d(in_channels=args.atom_dim, out_channels=args.atom_dim, kernel_size=1)
+        # self.conv1d_trans = nn.Conv1d(in_channels=args.atom_dim, out_channels=args.atom_dim, kernel_size=1)
 
         self.mlp = nn.Sequential(
             nn.Linear(in_features=args.atom_dim, out_features=args.mlp_hid_dim),
@@ -17,10 +19,10 @@ class MyModel(nn.Module):
             nn.Dropout(p=args.dropout),
             nn.Linear(in_features=args.mlp_hid_dim, out_features=args.n_class)
         )
-        self.loss = nn.MSELoss()
+        # self.loss = nn.MSELoss()
 
-        self.norm1 = nn.LayerNorm(args.atom_dim)
-        self.norm2= nn.LayerNorm(args.atom_dim)
+        # self.norm1 = nn.LayerNorm(args.atom_dim)
+        # self.norm2 = nn.LayerNorm(args.atom_dim)
 
         self.ffn = nn.Sequential(
             nn.Linear(args.atom_dim, 2048),
@@ -29,6 +31,12 @@ class MyModel(nn.Module):
             nn.Linear(2048, args.atom_dim),
             nn.Dropout(p=args.dropout)
         )
+
+        self.norm1s = nn.ModuleList([nn.LayerNorm(args.atom_dim) for _ in range(args.block_num)])
+        self.norm2s = nn.ModuleList([nn.LayerNorm(args.atom_dim) for _ in range(args.block_num)])
+
+        self.ffns = nn.ModuleList([copy.deepcopy(self.ffn) for _ in range(args.block_num)])
+
 
     def gnn_message_passing(self, adj, embeds):
         return torch.bmm(adj, embeds)  # 批量矩阵乘法，只适用于稠密矩阵
@@ -44,19 +52,23 @@ class MyModel(nn.Module):
         L1 = 0
         history_embeds = [embeds]
         for i in range(args.block_num):
-            # embeds = torch.bmm(cnn_mask, embeds)
-            # embeds = self.gnn_message_passing(adj, embeds)
+
+            # 计算注意力矩阵
             output, attn_weights = self.transformer_encoder.self_attn(
                 embeds, embeds, embeds, attn_mask=None, key_padding_mask=mask, need_weights=True
             )
+
+            # 计算RGloss
             attn_weights = torch.bmm(cnn_mask, attn_weights)
             L1 += self.loss(adj[:args.clip_n_atom, :args.clip_n_atom], attn_weights[:args.clip_n_atom, :args.clip_n_atom])
             L1 += self.loss(adj[args.clip_n_atom:, args.clip_n_atom:], attn_weights[args.clip_n_atom:, args.clip_n_atom:])
 
-            embeds = self.norm1(embeds + self.gnn_message_passing(adj + attn_weights, embeds))
+            # 根据输入的邻接矩阵加上邻居节点信息 + 残差 + 层归一
+            embeds = self.norm1s[i](embeds + self.gnn_message_passing(adj, embeds)) # adj + attn_weights
 
+            # 只加下面两行，相当于transformerEncoderLayer
             # embeds = self.norm1(embeds + output)
-            embeds = self.norm2(embeds + self.ffn(embeds))
+            embeds = self.norm2s[i](embeds + self.ffns[i](embeds))
 
             history_embeds.append(embeds)
 

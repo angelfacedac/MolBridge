@@ -192,6 +192,29 @@ def smile_to_graph(smile):
     return node_features, adjacency
 
 
+def norm_adj(adj):
+    # 计算入度
+    in_degrees = torch.sum(adj, dim=0)  # 沿着第0维求和
+    # D_in = torch.diag(in_degrees)  # 创建对角矩阵
+
+    # 计算出度
+    out_degrees = torch.sum(adj, dim=1)  # 沿着第1维求和
+    # D_out = torch.diag(out_degrees)  # 创建对角矩阵
+
+    # 处理零值，避免 0^(-0.5) 导致 NaN
+    in_degrees = in_degrees + (in_degrees == 0).float() * 1e-10
+    out_degrees = out_degrees + (out_degrees == 0).float() * 1e-10
+
+    # 计算 -0.5 次方的矩阵
+    D_in_norm = torch.diag(torch.pow(in_degrees, -0.5))
+    D_out_norm = torch.diag(torch.pow(out_degrees, -0.5))
+
+    # 左乘 D_out_neg_half 和右乘 D_in_neg_half
+    result = torch.mm(D_out_norm, torch.mm(adj, D_in_norm))
+
+    return result
+
+
 class Mydata(Dataset):
     def __init__(self, root_path, kind_path):
         super(Mydata, self).__init__()
@@ -207,17 +230,20 @@ class Mydata(Dataset):
         return len(self.df)
 
 
+all_smile = set()
+embed_dict = dict()
+adj_dict = dict()
+mask_dict = dict()
+cnn_mask_dict = dict()
+
+
 def collate_fn(batch):
+    global embed_dict, adj_dict, mask_dict, cnn_mask_dict, all_smile
     """embeds, adjs, masks, cnn_masks, targets = data"""
-    all_smile = set()
+
     for smile1, smile2, _ in batch:
         all_smile.add(smile1)
         all_smile.add(smile2)
-
-    embed_dict = dict()
-    adj_dict = dict()
-    mask_dict = dict()
-    cnn_mask_dict = dict()
 
     for smile in all_smile:
         embed, adj = smile_to_graph(smile)
@@ -235,6 +261,8 @@ def collate_fn(batch):
 
         adj = torch.from_numpy(adj).float()
         new_adj[:pad_or_cut_size, :pad_or_cut_size] = adj[:pad_or_cut_size, :pad_or_cut_size]
+        if args.adj_is_norm:
+            new_adj = norm_adj(new_adj)
 
         mask = torch.tensor([False] * pad_or_cut_size + [True] * (args.clip_n_atom - pad_or_cut_size))
 

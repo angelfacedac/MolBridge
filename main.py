@@ -428,7 +428,7 @@ def main():
 
 if __name__ == '__main__':
     logdir_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # logdir_name = "2024-11-04_03-35-59"
+    # logdir_name = "2024-11-16_02-37-24"
 
     for k in range(5):
         main()
