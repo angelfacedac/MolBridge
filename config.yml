@@ -1,0 +1,40 @@
+# 选择模型
+model_name: 'only_block_AdamW'
+
+# 编辑实验名称
+experiment_name: '_2048_0d005_500'
+
+folds: [0, 1, 2, 3, 4]
+
+device: 'cuda:0'
+
+# bsz=1024->best_num_workers=8 for linx
+train:
+  batch_size: 2048
+  lr: 0.005
+  epochs: 500
+  loss_fn: 'CrossEntropyLoss'
+  optimizer:
+    name: ['AdamW', 'SGD']
+    threshold: 0.5
+  dropout: 0.1
+  num_workers: 8
+  multiproc_max_workers: 3
+  seed: 42
+
+model:
+  block:
+    num: 3
+    ffn:
+      hidden_dim: 2048
+  mlp:
+    hidden_dim: 256
+  attn_heads: 5
+  is_norm_adj: false
+
+data:
+  # note: 修改了数据集一定要记得修改分类数
+  source: "Deng"
+  num_classes: 65
+  atom_dim: 75
+  clip_num_atom: 50
