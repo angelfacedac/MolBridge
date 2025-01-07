@@ -1,11 +1,14 @@
 import torch
 from torch import nn
 from torch.nn import init
+import torch.nn.functional as F
 from torch_geometric.nn import SAGPooling
 
 from src.load_config import CONFIG
 from src.models import myloss, mylayers
 
+IS_RG = CONFIG['model']['is_rg']
+BATCH_SIZE = CONFIG['train']['batch_size']
 NUM_BLOCK = CONFIG['model']['block']['num']
 DEVICE = torch.device(CONFIG['device'])
 
@@ -20,6 +23,11 @@ class MyModel(nn.Module):
             [mylayers.Block() for _ in range(NUM_BLOCK)]
         )
 
+        self.reconstructGraph = mylayers.ReconstructGraph()
+
+        if IS_RG:
+            self.alpha = nn.Parameter(torch.tensor(0.0))
+
         # self.sagpooling =SAGPooling()
 
         self.loss_func = myloss.MyLoss()
@@ -33,16 +41,20 @@ class MyModel(nn.Module):
             init.zeros_(m.bias)
 
     def forward(self, embeds, adjs, masks, cnn_masks, targets):
-        embeds = embeds.to(DEVICE)
-        adjs = adjs.to(DEVICE)
-        masks = masks.to(DEVICE)
-        cnn_masks = cnn_masks.to(DEVICE)
-        targets = targets.to(DEVICE).long()
 
         history_embeds = [embeds]
 
+        if IS_RG:
+            r_adjs = self.reconstructGraph(embeds, embeds, cnn_masks)
+            # alpha, bata = F.softmax(torch.stack([self.alpha, 1.0 - self.alpha], dim=0), dim=0)
+            alpha, bata = 1.0, 1.0
+            sum_adjs = bata * adjs + alpha * r_adjs
+        else:
+            r_adjs = None
+            sum_adjs = adjs
+
         for block in self.blocks:
-            embeds = block(adjs, embeds)
+            embeds = block(sum_adjs, embeds)
             history_embeds.append(embeds)
 
         embeds = sum(history_embeds)
@@ -53,7 +65,10 @@ class MyModel(nn.Module):
 
         scores = self.mlp(embeds).squeeze()
 
-        loss = self.loss_func(scores, targets)
+        if IS_RG:
+            loss = self.loss_func(scores, targets, adjs, r_adjs)
+        else:
+            loss = self.loss_func(scores, targets)
 
         return scores, loss
 

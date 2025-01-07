@@ -1,4 +1,5 @@
 import torch
+from torch_geometric.utils import dense_to_sparse
 
 from src.datasets.dataloader.feature_encoding import smile_to_graph
 from src.datasets.dataloader.utils import norm_adj
@@ -85,3 +86,25 @@ def collate_fn(batch):
         targets[i] = target
 
     return embeds, adjs, masks, cnn_masks, targets
+
+# def tmp(batch):
+#     global embed_dict, adj_dict, mask_dict, cnn_mask_dict, all_smile
+#
+#     for smile1, smile2, _ in batch:
+#         all_smile.add(smile1)
+#         all_smile.add(smile2)
+#
+#     for smile in all_smile:
+#         embed, adj = smile_to_graph(smile)
+#
+#         # 将邻接矩阵转换为PyTorch张量
+#         adj = torch.tensor(adj, dtype=torch.float)
+#
+#         # 将密集的邻接矩阵转换为COO格式
+#         edge_index = dense_to_sparse(adj)[0]
+#
+#         embed = torch.from_numpy(embed).float()
+
+
+
+

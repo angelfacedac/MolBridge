@@ -35,24 +35,23 @@ def run():
         model = MyModel()
         model.to(DEVICE)
 
-        opt = [
-            getattr(optim, OPTIMIZER['name'][0])(
-                model.parameters(),
-                lr=LR
-            )
-            for _ in range(len(OPTIMIZER))
-        ]
+        opt = getattr(optim, OPTIMIZER['name'])(
+            model.parameters(),
+            lr=LR,
+            weight_decay=OPTIMIZER['weight_decay']
+        )
+        print("model:", model)
+        print("opt:", opt)
+        # exit()
 
         manager = Manager(fold_id, model)
+        manager.start()
+        manager.writer.add_text("model", str(model))
+        manager.writer.add_text("opt", str(opt))
 
         for epoch in range(EPOCHS):
 
-            if epoch + 1 > EPOCHS * OPTIMIZER['threshold']:
-                opt_id = 1
-            else:
-                opt_id = 0
-
-            manager.manage_train(epoch + 1, train(model, dataloader_train, opt[opt_id]))
+            manager.manage_train(epoch + 1, train(model, dataloader_train, opt))
             manager.manage_valid(epoch + 1, *valid(model, dataloader_valid))
             manager.manage_test(epoch + 1, *test(model, dataloader_test))
 

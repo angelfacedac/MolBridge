@@ -1,5 +1,6 @@
 import torch
 from src.load_config import CONFIG
+from src.experiments.move_data_to_device import move_data_to_device
 
 NUM_CLASSES = CONFIG['data']['num_classes']
 DEVICE = torch.device(CONFIG['device'])
@@ -13,7 +14,7 @@ def test(model, dataloader):
         y_pred = torch.empty(0).to(DEVICE)
         y_scores = torch.empty(0, NUM_CLASSES).to(DEVICE)
         for data in dataloader:
-            embeds, adjs, masks, cnn_masks, targets = data
+            embeds, adjs, masks, cnn_masks, targets = move_data_to_device(data, DEVICE)
             scores, loss = model(embeds, adjs, masks, cnn_masks, targets)
             sum_loss += loss.item()
             y_true = torch.cat((y_true, targets.to(DEVICE)), dim=0)

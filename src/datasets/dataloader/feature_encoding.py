@@ -8,6 +8,15 @@ def smile_to_graph(smile):
     :return: 分子的结点特征矩阵（原子数*原子dim）， 邻接矩阵（原子数*原子数）
     """
     molecule = Chem.MolFromSmiles(smile)
+
+    # 规范化 SMILES
+    canonical_smile = Chem.MolToSmiles(molecule, canonical=True)
+    molecule = Chem.MolFromSmiles(canonical_smile)
+
+    # 固定原子顺序
+    atom_order = list(Chem.CanonicalRankAtoms(molecule))
+    molecule = Chem.RenumberAtoms(molecule, atom_order)
+
     n_atoms = molecule.GetNumAtoms()
     atoms = [molecule.GetAtomWithIdx(i) for i in range(n_atoms)]
     adjacency = Chem.rdmolops.GetAdjacencyMatrix(molecule)

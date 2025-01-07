@@ -1,22 +1,23 @@
 # 选择模型
-model_name: 'only_block_AdamW'
+model_name: 'RG_GRU_AdamW_atomOrder'
 
 # 编辑实验名称
-experiment_name: '_2048_0d005_500'
+experiment_name: '1024_0d0025_500_1b1'
 
-folds: [0, 1, 2, 3, 4]
+folds: [0]
 
-device: 'cuda:0'
+device: 'cuda:1'
 
 # bsz=1024->best_num_workers=8 for linx
 train:
-  batch_size: 2048
-  lr: 0.005
+  batch_size: 1024
+  lr: 0.0025
   epochs: 500
   loss_fn: 'CrossEntropyLoss'
   optimizer:
-    name: ['AdamW', 'SGD']
-    threshold: 0.5
+    name: 'AdamW'
+    # 默认1e-2
+    weight_decay: 0.01
   dropout: 0.1
   num_workers: 8
   multiproc_max_workers: 3
@@ -30,6 +31,7 @@ model:
   mlp:
     hidden_dim: 256
   attn_heads: 5
+  is_rg: true
   is_norm_adj: false
 
 data:

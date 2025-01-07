@@ -1,5 +1,6 @@
 import concurrent.futures
 import os
+import signal
 
 import numpy as np
 import pandas as pd
@@ -7,6 +8,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from src.datasets.dataloader.collate_fn import collate_fn
+from src.experiments.move_data_to_device import move_data_to_device
 from src.load_config import CONFIG
 from src.utils.metrics import metrics
 
@@ -84,6 +86,16 @@ class Manager:
 
         self.executor.submit(metrics, y_true, y_pred).add_done_callback(callback)
 
+    def graceful_exit(self, signum, frame):
+        print("Received termination signal. Shutting down gracefully...")
+        self.executor.shutdown(wait=True)
+        exit(0)
+
+    def start(self):
+        # 注册信号处理函数
+        signal.signal(signal.SIGTERM, self.graceful_exit)
+        signal.signal(signal.SIGINT, self.graceful_exit)
+
     def add_embedding(self, stage):
         data_path = None
         if stage == 'valid':
@@ -91,8 +103,8 @@ class Manager:
         elif stage == 'test':
             data_path = os.path.join(self.data_fold_path, "test.csv")
         df = pd.read_csv(data_path)
-        df = df[df["label"].between(0, 9)]
-        sampled_df = df.groupby('label', group_keys=False).apply(lambda x: x.sample(min(len(x), 200)))
+        df = df[df["label"].between(0, 4)]
+        sampled_df = df.groupby('label', group_keys=False).apply(lambda x: x.sample(min(len(x), 400)))
         sampled_df = [sampled_df.iloc[i] for i in range(len(sampled_df))]
         embeds, adjs, masks, cnn_masks, labels = collate_fn(sampled_df)
         model = torch.load(os.path.join(self.fold_path, f'{self.max_id[stage]:03d}_{stage}.pth'))
@@ -103,6 +115,10 @@ class Manager:
             self.activations = input[0].detach()
 
         handle = model.mlp.register_forward_hook(forward_hook)
+        embeds, adjs, masks, cnn_masks, labels = move_data_to_device(
+            (embeds, adjs, masks, cnn_masks, labels),
+            DEVICE
+        )
         model(embeds, adjs, masks, cnn_masks, labels)
 
         print(self.activations)
