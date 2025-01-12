@@ -11,6 +11,7 @@ def smile_to_graph(smile):
 
     # 规范化 SMILES
     canonical_smile = Chem.MolToSmiles(molecule, canonical=True)
+    # print(smile, canonical_smile)
     molecule = Chem.MolFromSmiles(canonical_smile)
 
     # 固定原子顺序
@@ -21,7 +22,6 @@ def smile_to_graph(smile):
     atoms = [molecule.GetAtomWithIdx(i) for i in range(n_atoms)]
     adjacency = Chem.rdmolops.GetAdjacencyMatrix(molecule)
     node_features = np.array([atom_features(atom) for atom in atoms])
-
     return node_features, adjacency
 
 

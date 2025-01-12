@@ -1,7 +1,7 @@
-from .backup import zip_project_files
-from .metrics import metrics
-from .add_graph import add_graph
-from .set_seed import set_seed
+from src.utils.add_graph import add_graph
+from src.utils.backup import zip_project_files
+from src.utils.metrics import metrics
+from src.utils.set_seed import set_seed
 
 
 def backup_(output_filename, exclude_dirs=('data', 'tmp', 'logs', '.git', '.idea')):

@@ -1,4 +1,5 @@
 import torch
+from torch_geometric.data import Data, Batch
 from torch_geometric.utils import dense_to_sparse
 
 from src.datasets.dataloader.feature_encoding import smile_to_graph
@@ -25,6 +26,7 @@ def collate_fn(batch):
         all_smile.add(smile2)
 
     for smile in all_smile:
+        if smile in embed_dict: continue
         embed, adj = smile_to_graph(smile)
 
         # 数据对齐
@@ -39,6 +41,11 @@ def collate_fn(batch):
         new_embed[:pad_or_cut_size, :] = embed[:pad_or_cut_size, :]
 
         adj = torch.from_numpy(adj).float()
+
+        if CONFIG['model']['is_eye']:
+            identity_matrix = torch.eye(n_atom, dtype=torch.float32)
+            adj = adj + identity_matrix
+
         new_adj[:pad_or_cut_size, :pad_or_cut_size] = adj[:pad_or_cut_size, :pad_or_cut_size]
         if IS_NORM_ADJ:
             new_adj = norm_adj(new_adj)
@@ -87,24 +94,47 @@ def collate_fn(batch):
 
     return embeds, adjs, masks, cnn_masks, targets
 
-# def tmp(batch):
-#     global embed_dict, adj_dict, mask_dict, cnn_mask_dict, all_smile
-#
-#     for smile1, smile2, _ in batch:
-#         all_smile.add(smile1)
-#         all_smile.add(smile2)
-#
-#     for smile in all_smile:
-#         embed, adj = smile_to_graph(smile)
-#
-#         # 将邻接矩阵转换为PyTorch张量
-#         adj = torch.tensor(adj, dtype=torch.float)
-#
-#         # 将密集的邻接矩阵转换为COO格式
-#         edge_index = dense_to_sparse(adj)[0]
-#
-#         embed = torch.from_numpy(embed).float()
+
+def collate_fn_pyg(batch):
+    global embed_dict, adj_dict, mask_dict, cnn_mask_dict, all_smile
+
+    for smile1, smile2, _ in batch:
+        all_smile.add(smile1)
+        all_smile.add(smile2)
 
 
+    for smile in all_smile:
+        if smile in embed_dict: continue
 
+        embed, adj = smile_to_graph(smile)
 
+        # 将邻接矩阵转换为PyTorch张量
+        adj = torch.tensor(adj, dtype=torch.float)
+
+        if CONFIG['model']['is_eye']:
+            identity_matrix = torch.eye(adj.shape[0], dtype=torch.float32)
+            adj = adj + identity_matrix
+
+        # 将密集的邻接矩阵转换为COO格式
+        edge_index = dense_to_sparse(adj)[0]
+        embed = torch.from_numpy(embed).float()
+
+        embed_dict[smile] = embed
+        adj_dict[smile] = edge_index
+
+    batch_samples = []
+
+    for i, (smile1, smile2, target) in enumerate(batch):
+        embed1, adj1_coo = embed_dict[smile1], adj_dict[smile1]
+        embed2, adj2_coo = embed_dict[smile2], adj_dict[smile2]
+
+        embed = torch.cat([embed1, embed2], dim=0)
+        adj_coo = torch.cat([adj1_coo, adj2_coo + embed1.size(0)], dim=1)
+
+        sample = Data(x=embed, edge_index=adj_coo, y=target)
+
+        batch_samples.append(sample)
+
+    batch_samples = Batch.from_data_list(batch_samples)
+
+    return batch_samples

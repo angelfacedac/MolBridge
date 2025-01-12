@@ -1,7 +1,7 @@
 import os
-
 import shutil
 import zipfile
+
 from src.utils.manager import DATA_SOURCE, MODEL_NAME, EXPERIMENT_NAME
 
 

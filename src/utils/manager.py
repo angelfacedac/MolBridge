@@ -7,9 +7,10 @@ import pandas as pd
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from src.datasets.dataloader.collate_fn import collate_fn
+from src.datasets.dataloader.collate_fn import collate_fn, collate_fn_pyg
 from src.experiments.move_data_to_device import move_data_to_device
 from src.load_config import CONFIG
+from src.models import mymodel
 from src.utils.metrics import metrics
 
 DATA_SOURCE = CONFIG['data']['source']
@@ -77,7 +78,7 @@ class Manager:
                 if self.max_id[stage] != 0:
                     os.remove(os.path.join(self.fold_path, f'{self.max_id[stage]:03d}_{stage}.pth'))
                 self.max_id[stage] = epoch
-                torch.save(self.model, os.path.join(self.fold_path, f'{epoch:03d}_{stage}.pth'))
+                torch.save(self.model.state_dict(), os.path.join(self.fold_path, f'{epoch:03d}_{stage}.pth'))
                 self.writer.add_text(
                     f"metrics/{stage}",
                     f"|{accuracy:.4f}|{macro_f1:.4f}|{macro_precision:.4f}|{macro_recall:.4f}|",
@@ -96,32 +97,55 @@ class Manager:
         signal.signal(signal.SIGTERM, self.graceful_exit)
         signal.signal(signal.SIGINT, self.graceful_exit)
 
-    def add_embedding(self, stage):
+    def add_embedding(self, stage, is_pyg=False):
         data_path = None
         if stage == 'valid':
             data_path = os.path.join(self.data_fold_path, "val.csv")
         elif stage == 'test':
             data_path = os.path.join(self.data_fold_path, "test.csv")
         df = pd.read_csv(data_path)
-        df = df[df["label"].between(0, 4)]
+        df = df[df["label"].between(0, 3)]
         sampled_df = df.groupby('label', group_keys=False).apply(lambda x: x.sample(min(len(x), 400)))
         sampled_df = [sampled_df.iloc[i] for i in range(len(sampled_df))]
-        embeds, adjs, masks, cnn_masks, labels = collate_fn(sampled_df)
-        model = torch.load(os.path.join(self.fold_path, f'{self.max_id[stage]:03d}_{stage}.pth'))
-        model.to(DEVICE)
-        print(model)
 
         def forward_hook(module, input, output):
             self.activations = input[0].detach()
 
-        handle = model.mlp.register_forward_hook(forward_hook)
-        embeds, adjs, masks, cnn_masks, labels = move_data_to_device(
-            (embeds, adjs, masks, cnn_masks, labels),
-            DEVICE
-        )
-        model(embeds, adjs, masks, cnn_masks, labels)
 
-        print(self.activations)
+
+        if is_pyg:
+            model = mymodel.MyModelPYG()
+            model.to(DEVICE)
+            model.load_state_dict(
+                torch.load(
+                    os.path.join(self.fold_path, f'{self.max_id[stage]:03d}_{stage}.pth'),
+                    weights_only=True
+                )
+            )
+            handle = model.mlp.register_forward_hook(forward_hook)
+
+            data = collate_fn_pyg(sampled_df)
+            data = data.to(DEVICE)
+            labels = torch.LongTensor(data.y)
+            model(data)
+        else:
+            model = mymodel.MyModel()
+            model.to(DEVICE)
+            model.load_state_dict(
+                torch.load(
+                    os.path.join(self.fold_path, f'{self.max_id[stage]:03d}_{stage}.pth'),
+                    weights_only=True
+                )
+            )
+            handle = model.mlp.register_forward_hook(forward_hook)
+
+            embeds, adjs, masks, cnn_masks, labels = collate_fn(sampled_df)
+            embeds, adjs, masks, cnn_masks, labels = move_data_to_device(
+                (embeds, adjs, masks, cnn_masks, labels),
+                DEVICE
+            )
+            model(embeds, adjs, masks, cnn_masks, labels)
+
         self.writer.add_embedding(
             mat=self.activations,
             metadata=labels,

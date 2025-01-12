@@ -1,17 +1,19 @@
-# 选择模型
-model_name: 'RG_GRU_AdamW_atomOrder'
+# 选择模型 RG_GRU_AdamW_atomOrder
+model_name: 'multInS_GRU_AdamW_atomOrder_eye'
 
 # 编辑实验名称
-experiment_name: '1024_0d0025_500_1b1'
+experiment_name: '1024_0d005_500_0d0'
 
 folds: [0]
 
-device: 'cuda:1'
+is_pyg: false
 
-# bsz=1024->best_num_workers=8 for linx
+device: 'cuda:0'
+
+# bsz=1024->best_num_workers=8 for linx, 3 for L20
 train:
   batch_size: 1024
-  lr: 0.0025
+  lr: 0.005
   epochs: 500
   loss_fn: 'CrossEntropyLoss'
   optimizer:
@@ -19,7 +21,7 @@ train:
     # 默认1e-2
     weight_decay: 0.01
   dropout: 0.1
-  num_workers: 8
+  num_workers: 3
   multiproc_max_workers: 3
   seed: 42
 
@@ -32,7 +34,11 @@ model:
     hidden_dim: 256
   attn_heads: 5
   is_rg: true
+  alpha: 0.0
+  is_rg_loss: false
   is_norm_adj: false
+  is_eye: true
+  is_sag: false
 
 data:
   # note: 修改了数据集一定要记得修改分类数

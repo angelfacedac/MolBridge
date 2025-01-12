@@ -36,6 +36,8 @@ def get_activation(
         (embeds, adjs, masks, cnn_masks, labels),
         device
     )
+    init_embeds = torch.sum(embeds, dim=1)
+    activations.append(init_embeds)
     model(embeds, adjs, masks, cnn_masks, labels)
     handle.remove()
 
@@ -43,16 +45,17 @@ def get_activation(
 
 
 def t_sne_2d(activations, labels, save_path):
-    # 使用t-SNE进行降维
     tsne = TSNE(n_components=2, random_state=42)
-    reduced_activations = tsne.fit_transform(activations[0].numpy())
-    # 绘制t-SNE图
-    plt.figure(figsize=(10, 7))
-    plt.scatter(reduced_activations[:, 0], reduced_activations[:, 1], c=labels, cmap="viridis", alpha=0.7)
-    plt.colorbar(label='Labels')
+    for k in [0, 1]:
+        embeds = activations[k]
+        reduced_activations = tsne.fit_transform(embeds.numpy())
+        ax = plt.subplot(2, 1, k + 1)
+        ax.scatter(reduced_activations[:, 0], reduced_activations[:, 1], c=labels, cmap="viridis", alpha=0.7)
+
+    # plt.colorbar(label='Labels')
     plt.title('t-SNE Visualization of Activations')
-    plt.xlabel('t-SNE Component 1')
-    plt.ylabel('t-SNE Component 2')
+    # plt.xlabel('t-SNE Component 1')
+    # plt.ylabel('t-SNE Component 2')
     plt.savefig(save_path)
 
 

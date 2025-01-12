@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="linx@172.22.9.201:22 password" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="彗星云" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="DSN-DDI">
         <serverdata>
@@ -139,6 +139,20 @@
         <serverdata>
           <mappings>
             <mapping deploy="/root/data/RGDDI" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="彗星云">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/root/data/GRN-DDI" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="彗星云Ryu">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/root/data/GRN-DDI" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

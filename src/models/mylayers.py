@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch_sparse import SparseTensor
 
 from src.load_config import CONFIG
 
@@ -27,9 +28,9 @@ class MLP(nn.Module):
         return self.net(embeds)
 
 
-class Block(nn.Module):
+class GRU(nn.Module):
     def __init__(self):
-        super(Block, self).__init__()
+        super(GRU, self).__init__()
 
         self.ffn = nn.Sequential(
             nn.Linear(ATOM_DIM, BLOCK_FFN_HIDDEN_DIM),
@@ -50,9 +51,43 @@ class Block(nn.Module):
         return embeds
 
 
-class ReconstructGraph(nn.Module):
+class GRUPYG(nn.Module):
     def __init__(self):
-        super(ReconstructGraph, self).__init__()
+        super(GRUPYG, self).__init__()
+
+        self.ffn = nn.Sequential(
+            nn.Linear(ATOM_DIM, BLOCK_FFN_HIDDEN_DIM),
+            nn.ReLU(),
+            nn.Dropout(p=DROPOUT_P),
+            nn.Linear(BLOCK_FFN_HIDDEN_DIM, ATOM_DIM),
+            nn.Dropout(p=DROPOUT_P)
+        )
+        self.norm1 = nn.LayerNorm(ATOM_DIM)
+        self.norm2 = nn.LayerNorm(ATOM_DIM)
+
+    def messaging(self, adj_coo, embeds):
+        row, col = adj_coo
+        adj_sparse = torch.sparse_coo_tensor(
+            indices=torch.stack([row, col]),
+            values=torch.ones(row.size(), dtype=torch.float32),
+            size=(embeds.size(0), embeds.size(0)),
+            device=adj_coo.device
+        )
+        # 使用 torch.sparse.mm 进行稀疏矩阵和稠密矩阵的乘法
+        return torch.sparse.mm(adj_sparse, embeds)
+        # return SparseTensor(
+        #     row=adj_coo[0], col=adj_coo[1], sparse_sizes=(embeds.size(0), embeds.size(0))
+        # ).to_device(adj_coo.device) @ embeds
+
+    def forward(self, adj_coo, embeds):
+        embeds = self.norm1(embeds + self.messaging(adj_coo, embeds))
+        embeds = self.norm2(embeds + self.ffn(embeds))
+        return embeds
+
+
+class CoAttention(nn.Module):
+    def __init__(self):
+        super(CoAttention, self).__init__()
 
         self.w_q = nn.Parameter(torch.zeros(ATOM_DIM, ATOM_DIM // 2))
         self.w_k = nn.Parameter(torch.zeros(ATOM_DIM, ATOM_DIM // 2))
@@ -64,7 +99,7 @@ class ReconstructGraph(nn.Module):
         nn.init.xavier_uniform_(self.bias.view(*self.bias.shape, -1))
         nn.init.xavier_uniform_(self.a.view(*self.a.shape, -1))
 
-    def forward(self, receiver, attendant, adj_mask=None):
+    def forward(self, receiver, attendant, mask=None):
         keys = receiver @ self.w_k
         queries = attendant @ self.w_q
         # values = receiver @ self.w_v
@@ -74,8 +109,7 @@ class ReconstructGraph(nn.Module):
         e_scores = torch.tanh(e_activations) @ self.a
         # e_scores = e_activations @ self.a
         attentions = e_scores
-        if adj_mask is not None:
-            attentions = torch.bmm(adj_mask, attentions)
-            attentions = torch.bmm(attentions, adj_mask)
+        if mask is not None:
+            attentions = attentions.masked_fill(mask, -1e9)
         return attentions
 
