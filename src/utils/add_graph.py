@@ -37,7 +37,7 @@ def add_graph(tensorboard_path):
         embeds, adj, masks, cnn_masks, targets = move_data_to_device([embeds, adj, masks, cnn_masks, targets], DEVICE)
         data = [embeds, adj, masks, cnn_masks, targets]
     model.to(DEVICE)
-    print(data)
+    # print(data)
     writer.add_graph(model, data)
     writer.close()
 

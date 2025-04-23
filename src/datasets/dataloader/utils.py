@@ -29,7 +29,7 @@ def norm_adj(adj):
     # D = torch.diag(degrees)  # 创建对角矩阵
 
     # 处理零值，避免 0^(-0.5) 导致 NaN
-    in_degrees = degrees + (degrees == 0).float() * 1e-10
+    in_degrees = degrees + (degrees == 0).float() * 1e-9
 
     # 计算 -0.5 次方的矩阵
     D_norm = torch.diag(torch.pow(in_degrees, -1))

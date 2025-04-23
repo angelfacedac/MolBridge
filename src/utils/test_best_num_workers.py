@@ -36,7 +36,7 @@ def test_best_num_workers():
         val_dataloader = get_dataloader(num_workers, 'val')
         test_dataloader = get_dataloader(num_workers, 'test')
 
-        model = MyModelPYG()
+        model = MyModel()
         model.to(DEVICE)
 
         opt = getattr(optim, OPTIMIZER['name'])(
@@ -52,9 +52,9 @@ def test_best_num_workers():
 
         start = time()
         for epoch in range(10):
-            manager.manage_train(epoch + 1, train_pyg(model, train_dataloader, opt))
-            manager.manage_valid(epoch + 1, *valid_pyg(model, val_dataloader))
-            manager.manage_test(epoch + 1, *test_pyg(model, test_dataloader))
+            manager.manage_train(epoch + 1, train(model, train_dataloader, opt))
+            manager.manage_valid(epoch + 1, *valid(model, val_dataloader))
+            manager.manage_test(epoch + 1, *test(model, test_dataloader))
 
         # manager.add_embedding('test', is_pyg=True)
 
@@ -75,7 +75,7 @@ def get_dataloader(num_workers, stage):
         dataset,
         batch_size=BATCH_SIZE,
         shuffle=(stage == 'train'),
-        collate_fn=collate_fn_pyg,
+        collate_fn=collate_fn,
         num_workers=num_workers
     )
     return dataloader

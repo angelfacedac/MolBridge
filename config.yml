@@ -1,10 +1,10 @@
 # 选择模型 RG_GRU_AdamW_atomOrder
-model_name: 'multInS_GRU_AdamW_atomOrder_eye'
+model_name: 'GRN-DDI'
 
 # 编辑实验名称
-experiment_name: '1024_0d005_500_0d0'
+experiment_name: '3d2-num3'
 
-folds: [0]
+folds: [0, 1, 2, 3, 4]
 
 is_pyg: false
 
@@ -12,7 +12,7 @@ device: 'cuda:0'
 
 # bsz=1024->best_num_workers=8 for linx, 3 for L20
 train:
-  batch_size: 1024
+  batch_size: 512
   lr: 0.005
   epochs: 500
   loss_fn: 'CrossEntropyLoss'
@@ -21,7 +21,7 @@ train:
     # 默认1e-2
     weight_decay: 0.01
   dropout: 0.1
-  num_workers: 3
+  num_workers: 4
   multiproc_max_workers: 3
   seed: 42
 
@@ -32,17 +32,25 @@ model:
       hidden_dim: 2048
   mlp:
     hidden_dim: 256
-  attn_heads: 5
+  attn_heads: 4
+  is_a_: true
   is_rg: true
   alpha: 0.0
-  is_rg_loss: false
-  is_norm_adj: false
+  is_alpha_learn: true
   is_eye: true
+  is_norm_adj: false
+  is_gcn: false
+  is_gat: false
+  is_gin: false
+  is_cat_after_readout: false
   is_sag: false
+  is_init_gru: false
+  is_joint: true
 
 data:
   # note: 修改了数据集一定要记得修改分类数
   source: "Deng"
   num_classes: 65
   atom_dim: 75
+  atom_hid_dim: 256
   clip_num_atom: 50

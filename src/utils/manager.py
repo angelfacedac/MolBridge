@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from src.datasets.dataloader.collate_fn import collate_fn, collate_fn_pyg
 from src.experiments.move_data_to_device import move_data_to_device
+from src.experiments.test import test
 from src.load_config import CONFIG
 from src.models import mymodel
 from src.utils.metrics import metrics
@@ -22,7 +23,7 @@ DEVICE = torch.device(CONFIG['device'])
 
 
 class Manager:
-    def __init__(self, fold_id, model):
+    def __init__(self, fold_id=None, model=None):
         self.activations = None
         self.model = model
         self.my_metrics_for_model = {
@@ -36,10 +37,10 @@ class Manager:
         self.fold_path = os.path.join('logs', DATA_SOURCE, MODEL_NAME, EXPERIMENT_NAME, str(fold_id))
         self.data_fold_path = os.path.join('src', 'data', DATA_SOURCE, str(fold_id))
 
-        self.writer = SummaryWriter(self.fold_path)
-        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=MULTIPROC_MAX_WORKERS)
-
-        self.add_config()
+        if fold_id is not None:
+            self.writer = SummaryWriter(self.fold_path)
+            self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=MULTIPROC_MAX_WORKERS)
+            self.add_config()
 
     def manage_train(self, epoch, loss):
         self.add_loss(epoch, 'train', loss)
@@ -54,6 +55,23 @@ class Manager:
         y_true, y_pred = self.move_tensor2numpy(y_true, y_pred)
         self.add_loss(epoch, 'test', loss)
         self.add_metrics_by_y(epoch, 'test', y_true, y_pred)
+
+    def test(self, dataloader, model_params_path=None):
+        if model_params_path is not None:
+            path = model_params_path
+        else:
+            path = os.path.join(self.fold_path, f'{self.max_id["valid"]:03d}_valid.pth')
+        model_params = torch.load(
+            path,
+            weights_only=True
+        )
+        model = mymodel.MyModel()
+        model.load_state_dict(model_params)
+        model.to(DEVICE)
+        loss, y_true, y_pred, y_scores = test(model, dataloader)
+        y_true, y_pred = self.move_tensor2numpy(y_true, y_pred)
+        macro_precision, macro_recall, macro_f1, accuracy = metrics(y_true, y_pred)
+        return accuracy, macro_f1, macro_precision, macro_recall
 
     def add_metrics(self, epoch, stage, **metrics):
         for metric_name, metric_value in metrics.items():
@@ -87,6 +105,10 @@ class Manager:
 
         self.executor.submit(metrics, y_true, y_pred).add_done_callback(callback)
 
+    def wait_all_tasks(self):
+        self.executor.shutdown(wait=True)  # 等待所有任务完成
+        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=MULTIPROC_MAX_WORKERS)  # 重建执行器
+
     def graceful_exit(self, signum, frame):
         print("Received termination signal. Shutting down gracefully...")
         self.executor.shutdown(wait=True)
@@ -110,8 +132,6 @@ class Manager:
 
         def forward_hook(module, input, output):
             self.activations = input[0].detach()
-
-
 
         if is_pyg:
             model = mymodel.MyModelPYG()
@@ -157,7 +177,15 @@ class Manager:
 
     def add_model_parameters_histogram(self, epoch):
         for name, param in self.model.named_parameters():
+            # print(f"\nParameter: {name}")
+            # print(f"Shape: {param.shape}")
+            # print(f"Min: {param.min().item():.6f}")
+            # print(f"Max: {param.max().item():.6f}")
+            # print(f"Mean: {param.mean().item():.6f}")
+            # print(f"Contains NaN: {torch.isnan(param).any()}")
+            # print(f"Contains Inf: {torch.isinf(param).any()}")
             self.writer.add_histogram(name, param.clone().cpu().data.numpy(), epoch)
+        # exit()
 
     def add_config(self):
         config_str = '\n'.join([f'{k}: {v}' for k, v in CONFIG.items()])

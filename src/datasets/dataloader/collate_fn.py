@@ -92,7 +92,7 @@ def collate_fn(batch):
         cnn_masks[i] = cnn_mask
         targets[i] = target
 
-    return embeds, adjs, masks, cnn_masks, targets
+    return embeds, adjs, masks.to(dtype=torch.bool), cnn_masks, targets
 
 
 def collate_fn_pyg(batch):

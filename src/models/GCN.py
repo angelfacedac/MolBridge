@@ -41,10 +41,10 @@ class GraphConvolution(nn.Module):
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
 
-    def forward(self, input, adj):
-        support = torch.mm(input, self.weight)
-        output = torch.spmm(adj, support)
+    def forward(self, adj, input):
+        input = torch.bmm(input, self.weight.unsqueeze(0).expand(input.size(0), -1, -1))
+        input = torch.bmm(adj, input)
         if self.bias is not None:
-            return output + self.bias
+            return input + self.bias
         else:
-            return output
+            return input

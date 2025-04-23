@@ -2,6 +2,7 @@ import os
 
 import torch
 from torch import optim
+from tqdm import tqdm
 
 from src.datasets.get_dataloader import get_dataloader, get_dataloader_pyg
 from src.experiments.test import test, test_pyg
@@ -23,7 +24,7 @@ DEVICE = torch.device(CONFIG['device'])
 
 
 @set_seed_(CONFIG['train']['seed'])
-@add_graph_(os.path.join('logs', DATA_SOURCE, MODEL_NAME, EXPERIMENT_NAME))
+# @add_graph_(os.path.join('logs', DATA_SOURCE, MODEL_NAME, EXPERIMENT_NAME))
 @backup_(os.path.join('logs', DATA_SOURCE, MODEL_NAME, EXPERIMENT_NAME, 'project_backup.zip'))
 def run():
     for fold_id in FOLDS:
@@ -40,8 +41,8 @@ def run():
             lr=LR,
             weight_decay=OPTIMIZER['weight_decay']
         )
-        print("model:", model)
-        print("opt:", opt)
+        # print("model:", model)
+        # print("opt:", opt)
         # exit()
 
         manager = Manager(fold_id, model)
@@ -49,13 +50,23 @@ def run():
         manager.writer.add_text("model", str(model))
         manager.writer.add_text("opt", str(opt))
 
-        for epoch in range(EPOCHS):
+        for epoch in tqdm(range(EPOCHS)):
 
             manager.manage_train(epoch + 1, train(model, dataloader_train, opt))
             manager.manage_valid(epoch + 1, *valid(model, dataloader_valid))
-            manager.manage_test(epoch + 1, *test(model, dataloader_test))
+            # manager.manage_test(epoch + 1, *test(model, dataloader_test))
 
-        manager.add_embedding('test')
+        # manager.add_embedding('test')
+        manager.wait_all_tasks()  # 先等待
+        acc, f1, pre, rec = manager.test(dataloader_valid)
+        print("+"*50 + "val" + "+"*50)
+        print("acc | macro_f1 | macro_pre | macro_rec")
+        print(f"{acc:.04f}|{f1:.04f}|{pre:.04f}|{rec:.04f}")
+        acc, f1, pre, rec = manager.test(dataloader_test)
+        print("="*50 + "s1" + "="*50)
+        print("acc | macro_f1 | macro_pre | macro_rec")
+        print(f"{acc:.04f}|{f1:.04f}|{pre:.04f}|{rec:.04f}")
+        print("="*100)
 
         manager.close()
 
