@@ -17,6 +17,9 @@ We introduce a novel graph joint learning framework with graph residual network 
 
 Experimental results on benchmark datasets demonstrate that GRN-DDI outperforms state-of-the-art baseline methods by at least 2.19% and 2.49% in Macro-F1 and Macro-Rec scores, respectively. This highlights its superior performance in DDI event prediction through the dual-perspective graph joint learning strategy.
 
+[Framework.pdf](https://github.com/user-attachments/files/19872618/Framework.pdf)
+
+
 ## Installation and Dependencies
 
 ### Requirements
