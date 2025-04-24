@@ -17,7 +17,9 @@ We introduce a novel graph joint learning framework with graph residual network 
 
 Experimental results on benchmark datasets demonstrate that GRN-DDI outperforms state-of-the-art baseline methods by at least 2.19% and 2.49% in Macro-F1 and Macro-Rec scores, respectively. This highlights its superior performance in DDI event prediction through the dual-perspective graph joint learning strategy.
 
-[Framework.pdf](https://github.com/user-attachments/files/19872618/Framework.pdf)
+Paper link: XXXXXXXXX
+
+![Framework](./Framework.png)
 
 
 ## Installation and Dependencies
@@ -150,7 +152,7 @@ from src.models.mymodel import MyModel
 from src.datasets.dataloader.feature_encoding import smile_to_graph
 
 # Load trained model
-model_path = "logs/Deng/GRN-DDI/3d2-num3/0/001_valid.pth"
+model_path = "best_model.pth"
 model = MyModel()
 model.load_state_dict(torch.load(model_path, weights_only=True))
 model.eval()
