@@ -209,10 +209,5 @@ These metrics are computed for both validation and test sets during model traini
 If you use this code in your research, please cite:
 
 ```
-@article{GRN-DDI2023,
-  title={Graph Joint Learning for Predicting Drug-Drug Interaction Event via Graph Residual Network},
-  author={Your Name},
-  journal={arXiv preprint},
-  year={2023}
-}
+XXXXXXXX
 ```
