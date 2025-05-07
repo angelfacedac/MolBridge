@@ -26,7 +26,7 @@ Paper link: XXXXXXXXX
 
 ### Requirements
 
-- Python 3.x
+- Python 3.9
 - PyTorch 2.4.0 (with CUDA 11.8 support)
 - PyTorch Geometric 2.6.1
 - RDKit 2024.9.6
