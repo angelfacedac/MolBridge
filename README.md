@@ -1,21 +1,8 @@
-# GRN-DDI: Graph Joint Learning for Predicting Drug-Drug Interaction Event via Graph Residual Network
+# MolBridge: Atom-Level Joint Graph Refinement for Robust Drug-Drug Interaction Prediction
 
 ## Introduction
 
-GRN-DDI is an advanced deep learning framework for predicting drug-drug interactions (DDIs) using graph neural networks. As a promising strategy for medical therapy, drug combinations may cause various adverse events of drug-drug interaction. Accurately predicting DDI events with specific effects is crucial for developing safer therapies.
-
-This project addresses two significant challenges in DDI prediction:
-
-1. The failure to jointly model based on drug-drug pairs
-2. The barrier to representing explicit interactions of long-distance atoms within molecules
-
-We introduce a novel graph joint learning framework with graph residual network to predict drug-drug interaction events. Specifically, GRN-DDI:
-
-- Initially extracts local atom-based relationships between paired molecular structures via graph joint construction
-- Employs an innovative graph residual network to identify long-distance atom-based interactions within paired drugs from a global perspective
-- Effectively captures both local and global interactions in paired molecular graphs by integrating these components
-
-Experimental results on benchmark datasets demonstrate that GRN-DDI outperforms state-of-the-art baseline methods by at least 2.19% and 2.49% in Macro-F1 and Macro-Rec scores, respectively. This highlights its superior performance in DDI event prediction through the dual-perspective graph joint learning strategy.
+Drug combinations offer therapeutic benefits but also carry the risk of adverse drug–drug interactions (DDIs), especially under complex molecular structures. Accurate DDI event prediction requires capturing fine-grained inter-drug relationships, which are critical for modeling metabolic mechanisms such as _enzyme-mediated competition_. However, existing models typically rely on isolated drug representations and are limited to modeling atom-level cross-molecular interactions explicitly. To address this gap, we propose MolBridge, a novel atom-level joint graph refinement framework for robust DDI event prediction. MolBridge constructs a unified graph that integrates atomic structures of drug pairs, enabling direct modeling of inter-drug associations. To further capture long-range association while mitigating over-smoothing, we introduce a graph residual network that iteratively refines node features and preserves global structural context. This joint design allows MolBridge to effectively learn both local and global interaction patterns, yielding robust representations across both frequent and rare DDI types. Extensive experiments on two benchmark datasets show that MolBridge consistently outperforms state-of-the-art baselines, with at least 2.19\% and 2.49\% improvements in Macro-F1 and Macro-Recall, respectively. These results demonstrate the advantages of fine-grained graph refinement in improving the accuracy, robustness, and mechanistic interpretability of DDI prediction.
 
 Paper link: XXXXXXXXX
 
@@ -41,8 +28,6 @@ Paper link: XXXXXXXXX
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/GRN-DDI.git
-cd GRN-DDI
 
 # Create and activate virtual environment (optional but recommended)
 python -m venv venv
@@ -67,7 +52,7 @@ The model parameters can be configured in the `config.yml` file:
 
 ```yaml
 # Model selection
-model_name: 'GRN-DDI'
+model_name: 'MolBridge'
 
 # Experiment name
 experiment_name: '3d2-num3'
