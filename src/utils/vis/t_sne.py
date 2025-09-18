@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 from mpl_toolkits import mplot3d
@@ -24,11 +24,13 @@ def get_activation(
         end_class,
         num_sample_per_class,
 ):
-    # df = pd.read_csv(data_path)
-    # df = df[df["label"].between(begin_class, end_class)]
-    # sampled_df = df.groupby('label', group_keys=False).apply(lambda x: x.sample(min(len(x), num_sample_per_class)))
+    df = pd.read_csv(data_path)
+    df = df[df["label"].between(begin_class, end_class)]
+    sampled_df = df.groupby('label', group_keys=False).apply(lambda x: x.sample(min(len(x), num_sample_per_class)))
 
-    sampled_df = pd.read_csv("sample-tsne.csv")
+    # sampled_df.to_csv("sample_tsne.csv", index=False)
+
+    sampled_df = pd.read_csv(data_path)
     sampled_df = sampled_df.loc[:, ['smile_1', 'smile_2', 'label']]
 
     sampled_df = [sampled_df.iloc[i] for i in range(len(sampled_df))]
@@ -110,7 +112,7 @@ def t_sne_2d_single(activations, labels, colors, save_path):
     # plt.ylabel('t-SNE Component 2')
     plt.tight_layout()  # 自动调整子图参数
     plt.show()
-    # plt.savefig(save_path)
+    plt.savefig(save_path)
 
 
 def t_sne_3d(activations, labels, colors, save_path):

@@ -1,10 +1,11 @@
 # 选择模型 RG_GRU_AdamW_atomOrder
-model_name: 'GRN-DDI'
+model_name: 'MulBridge-woJoint&RG'
 
 # 编辑实验名称
-experiment_name: '3d2-num3'
+experiment_name: '3d2-batch1024-num4'
+# 3d2 -> 512 0.005 500 3 line
 
-folds: [0, 1, 2, 3, 4]
+folds: [4]
 
 is_pyg: false
 
@@ -12,7 +13,7 @@ device: 'cuda:0'
 
 # bsz=1024->best_num_workers=8 for linx, 3 for L20
 train:
-  batch_size: 512
+  batch_size: 1024 # 512
   lr: 0.005
   epochs: 500
   loss_fn: 'CrossEntropyLoss'
@@ -27,7 +28,7 @@ train:
 
 model:
   block:
-    num: 3
+    num: 4 # 3
     ffn:
       hidden_dim: 2048
   mlp:
@@ -49,8 +50,8 @@ model:
 
 data:
   # note: 修改了数据集一定要记得修改分类数
-  source: "Deng"
-  num_classes: 65
+  source: "Ryu"
+  num_classes: 86
   atom_dim: 75
   atom_hid_dim: 256
   clip_num_atom: 50

@@ -6,6 +6,7 @@ from src.load_config import CONFIG
 from src.run import run, run_pyg
 
 warnings.filterwarnings("ignore", category=UserWarning, module='sklearn.metrics._classification')
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 faulthandler.enable()
 
 
