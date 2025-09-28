@@ -2,7 +2,11 @@ import os
 import shutil
 import zipfile
 
-from src.utils.manager import DATA_SOURCE, MODEL_NAME, EXPERIMENT_NAME
+from src.load_config import CONFIG
+
+DATA_SOURCE = CONFIG['data']['source']
+MODEL_NAME = CONFIG['model_name']
+EXPERIMENT_NAME = CONFIG['experiment_name']
 
 
 def zip_project_files(output_filename, exclude_dirs=('data', 'tmp', 'logs', '.git', '.idea')):

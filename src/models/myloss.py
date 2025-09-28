@@ -14,7 +14,12 @@ class MyLoss(nn.Module):
         self.criterion = getattr(nn, LOSS_FN)()
 
     def forward(self, scores, targets):
-        loss1 = self.criterion(scores, targets.long())
+        if CONFIG['data']['is_binary']:
+            # 二分类：使用BCEWithLogitsLoss，targets需要转换为float
+            loss1 = self.criterion(scores.squeeze(), targets.float())
+        else:
+            # 多分类：使用CrossEntropyLoss，targets转换为long
+            loss1 = self.criterion(scores, targets.long())
         return loss1
 
 

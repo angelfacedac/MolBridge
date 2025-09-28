@@ -1,4 +1,5 @@
 import torch
+from tqdm import tqdm
 
 from src.experiments.move_data_to_device import move_data_to_device
 from src.load_config import CONFIG

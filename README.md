@@ -6,7 +6,7 @@ Drug combinations offer therapeutic benefits but also carry the risk of adverse 
 
 Paper link: XXXXXXXXX
 
-![Framework](./Framework.png)
+![Framework](./figures/Framework.png)
 
 
 ## Installation and Dependencies
@@ -196,3 +196,43 @@ If you use this code in your research, please cite:
 ```
 XXXXXXXX
 ```
+ 
+## Atom Feature Encoding
+ 
+- Purpose: provide the complete atom feature schema for molecular graphs.
+- Feature vector per atom has 75 dimensions composed of:
+  - Atomic symbol (44): one-hot over [C, N, O, S, F, Si, P, Cl, Br, Mg, Na, Ca, Fe, As, Al, I, B, V, K, Tl, Yb, Sb, Sn, Ag, Pd, Co, Se, Ti, Zn, H, Li, Ge, Cu, Au, Ni, Cd, In, Mn, Zr, Cr, Pt, Hg, Pb, Unknown]
+  - Atomic degree (11): one-hot over [0–10]
+  - Implicit valence (7): one-hot over [0–6]
+  - Formal charge (1): integer scalar (typically −3 to +3)
+  - Radical electrons (1): integer scalar (typically 0–2)
+  - Hybridization (5): one-hot over [SP, SP2, SP3, SP3D, SP3D2]
+  - Aromaticity (1): binary indicator (0/1)
+  - Total hydrogens (5): one-hot over [0–4]
+ 
+## Implementation Details
+ 
+- Baselines: DeepDDI, R-GCN, GoGNN, TrimNet‑DDI, SSI‑DDI, MUFFIN, MRCGNN（reported）；DSN‑DDI、CSSE‑DDI、TIGER（re‑implemented per official configs）。
+- Data split and metrics: 5‑fold CV with 7:1:2 train/val/test；report Accuracy、Macro‑F1、Macro‑Recall、Macro‑Precision。
+- Training config: batch size 512、learning rate 0.005、seed 42、3 GFormer layers；optimizer AdamW；early stopping on validation；average over folds。
+- Environment: Intel Xeon Platinum‑8457C、NVIDIA L20 (48GB)、Ubuntu 22.04.1 LTS、PyTorch 2.4.0 (CUDA 11.8)、RDKit 2024.9.6。
+ 
+## Ablation Study
+ 
+- Variants on Deng’s dataset:
+  - w/o SCM：replace Structure Consistency Module with standard GCN layers
+  - w/o A'：remove chemical bond adjacency matrix
+  - w/o Ar：remove attention‑based graph reconstruction
+  - w/o Joint：no joint construction；model drugs independently then fuse
+- Conclusion: all components contribute；SCM is most critical；joint construction and the combination of A' and Ar are both necessary。
+- Figure: [figures/ablation/ablation_study_deng.pdf](./figures/ablation/ablation_study_deng.pdf)
+ 
+## Hyperparameter Sensitivity Analysis
+ 
+- Swept hyperparameters on Deng：learning rate、batch size、attention heads、SCM layers。
+- Best configuration：lr=0.005、batch=512、heads=4、SCM layers=3。
+- Figures：
+  - Learning rate: [figures/hparam/lr.pdf](./figures/hparam/lr.pdf)
+  - Batch size: [figures/hparam/Batch.pdf](./figures/hparam/Batch.pdf)
+  - Attention heads: [figures/hparam/head.pdf](./figures/hparam/head.pdf)
+  - SCM layers: [figures/hparam/num-of-GRU.pdf](./figures/hparam/num-of-GRU.pdf)

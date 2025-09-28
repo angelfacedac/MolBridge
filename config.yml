@@ -1,11 +1,12 @@
 # 选择模型 RG_GRU_AdamW_atomOrder
-model_name: 'MulBridge-woJoint&RG'
+model_name: 'MulBridge'
 
 # 编辑实验名称
-experiment_name: '3d2-batch1024-num4'
+experiment_name: '3d2-lr0d0005'
 # 3d2 -> 512 0.005 500 3 line
+# ryu -> 3d2-batch1024-num4
 
-folds: [4]
+folds: [0,1,2,3,4]
 
 is_pyg: false
 
@@ -13,8 +14,8 @@ device: 'cuda:0'
 
 # bsz=1024->best_num_workers=8 for linx, 3 for L20
 train:
-  batch_size: 1024 # 512
-  lr: 0.005
+  batch_size: 512 # 512
+  lr: 0.0005
   epochs: 500
   loss_fn: 'CrossEntropyLoss'
   optimizer:
@@ -23,12 +24,26 @@ train:
     weight_decay: 0.01
   dropout: 0.1
   num_workers: 4
-  multiproc_max_workers: 3
+  multiproc_max_workers: 1
   seed: 42
+
+# 早停配置
+early_stopping:
+  enabled: true           # 是否启用早停
+  patience: 50          # 等待改善的epoch数
+  min_delta: 0.0001      # 最小改善阈值
+  monitor: 'val_loss'    # 监控指标: 'val_loss', 'val_acc', 'val_f1', 'combined'
+  mode: 'min'            # 'min' (损失) 或 'max' (准确率/F1)
+  verbose: true          # 是否打印早停信息
+
+# 最佳模型追踪配置
+best_model_tracking:
+  monitor: 'val_acc'     # 监控指标: 'val_loss', 'val_acc', 'val_f1', 'combined'
+  mode: 'max'            # 'min' (损失) 或 'max' (准确率/F1/combined)
 
 model:
   block:
-    num: 4 # 3
+    num: 3 # 3
     ffn:
       hidden_dim: 2048
   mlp:
@@ -49,9 +64,15 @@ model:
   is_joint: true
 
 data:
-  # note: 修改了数据集一定要记得修改分类数
-  source: "Ryu"
-  num_classes: 86
+  # note: 修改了数据集一定要记得修改分类数 (num_classes=1表示二分类，>1表示多分类)
+  source: "Deng"
+  num_classes: 65
   atom_dim: 75
   atom_hid_dim: 256
   clip_num_atom: 50
+
+# 预测结果储存配置
+save_predictions:
+  enabled: true            # 是否启用预测结果储存
+  save_detailed: true      # 是否保存详细预测结果(CSV文件)
+  save_summary: true       # 是否保存预测摘要(JSON文件)

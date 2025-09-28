@@ -7,12 +7,22 @@ def smile_to_graph(smile):
     :param smile:
     :return: 分子的结点特征矩阵（原子数*原子dim）， 邻接矩阵（原子数*原子数）
     """
-    molecule = Chem.MolFromSmiles(smile)
+    try:
+        molecule = Chem.MolFromSmiles(smile)
+        if molecule is None:
+            raise ValueError(f"Failed to parse SMILES: {smile}")
 
-    # 规范化 SMILES
-    canonical_smile = Chem.MolToSmiles(molecule, canonical=True)
-    # print(smile, canonical_smile)
-    molecule = Chem.MolFromSmiles(canonical_smile)
+        # 规范化 SMILES
+        canonical_smile = Chem.MolToSmiles(molecule, canonical=True)
+        # print(smile, canonical_smile)
+        molecule = Chem.MolFromSmiles(canonical_smile)
+        if molecule is None:
+            raise ValueError(f"Failed to parse canonical SMILES: {canonical_smile}")
+    except Exception as e:
+        print(f"SMILES Parse Error: {e}")
+        print(f"Problematic SMILES: {smile}")
+        # 返回None，让调用方跳过这个样本
+        return None, None
 
     # 固定原子顺序
     atom_order = list(Chem.CanonicalRankAtoms(molecule))
