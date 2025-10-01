@@ -217,84 +217,14 @@ XXXXXXXX
 - Training config: batch size 512、learning rate 0.005、seed 42、3 GFormer layers；optimizer AdamW；early stopping on validation；average over folds。
 - Environment: Intel Xeon Platinum‑8457C、NVIDIA L20 (48GB)、Ubuntu 22.04.1 LTS、PyTorch 2.4.0 (CUDA 11.8)、RDKit 2024.9.6。
  
-## Ablation Study
- 
-- Variants on Deng’s dataset:
-  - w/o SCM：replace Structure Consistency Module with standard GCN layers
-  - w/o A'：remove chemical bond adjacency matrix
-  - w/o Ar：remove attention‑based graph reconstruction
-  - w/o Joint：no joint construction；model drugs independently then fuse
-- Conclusion: all components contribute；SCM is most critical；joint construction and the combination of A' and Ar are both necessary。
-- Figure: [Supplymentary/ablation/ablation_study_deng.pdf](./Supplymentary/ablation/ablation_study_deng.pdf)
- 
-## Hyperparameter Sensitivity Analysis
- 
-- Swept hyperparameters on Deng：learning rate、batch size、attention heads、SCM layers。
-- Best configuration：lr=0.005、batch=512、heads=4、SCM layers=3。
-- Figures：
-  - Learning rate: [Supplymentary/hparam/lr.pdf](./Supplymentary/hparam/lr.pdf)
-  - Batch size: [Supplymentary/hparam/Batch.pdf](./Supplymentary/hparam/Batch.pdf)
-  - Attention heads: [Supplymentary/hparam/head.pdf](./Supplymentary/hparam/head.pdf)
-  - SCM layers: [Supplymentary/hparam/num-of-GRU.pdf](./Supplymentary/hparam/num-of-GRU.pdf)
+## Supplementary Materials
 
-## Complete Inductive Evaluation (S1/S2)
+For complete details on the following topics, please refer to the **Supplementary Material PDF** document:
+- **Ablation Study**: Complete analysis of model components (w/o SCM, w/o A', w/o Ar, w/o Joint)
+- **Hyperparameter Sensitivity Analysis**: Detailed analysis of learning rate, batch size, attention heads, and SCM layers
+- **Complete Inductive Evaluation**: Full S1 and S2 results on DrugBank and TWOSIDES
+- **Additional Visualizations**: t-SNE plots for high-frequency DDI events
+- **ATC Code Analysis**: Complete therapeutic classification analysis for all clusters
+- **Long-Distance Interaction Analysis**: Performance stratification by atomic path lengths
+- **Case Studies**: Pharmacologically validated molecular interaction examples
 
-This section provides the complete inductive evaluation results on DrugBank and TWOSIDES under the S1 and S2 settings. Methods marked with "*" use external knowledge graphs or heterogeneous networks.
-
-### S1 Results (DrugBank and TWOSIDES)
-
-| Methods     | DrugBank (S1) F1 | DrugBank Acc | DrugBank Kappa | TWOSIDES (S1) PR-AUC | TWOSIDES ROC-AUC | TWOSIDES Acc |
-|-------------|------------------:|-------------:|---------------:|----------------------:|-----------------:|-------------:|
-| MLP         | 21.1 ± 0.8        | 46.6 ± 2.1   | 33.4 ± 2.5     | 81.5 ± 1.5            | 81.2 ± 1.9       | 76.0 ± 2.1   |
-| Similarity  | 43.0 ± 5.0        | 51.3 ± 3.5   | 44.8 ± 3.8     | 56.2 ± 0.5            | 55.7 ± 0.6       | 53.9 ± 0.4   |
-| CSMDD       | 45.5 ± 1.8        | 62.6 ± 2.8   | 55.0 ± 3.2     | 73.2 ± 2.6            | 74.2 ± 2.9       | 69.9 ± 2.2   |
-| STNN-DDI*   | 39.7 ± 1.8        | 56.7 ± 2.6   | 46.5 ± 3.4     | 68.9 ± 2.0            | 68.3 ± 2.6       | 65.3 ± 1.8   |
-| HIN-DDI*    | 37.3 ± 2.9        | 58.9 ± 1.4   | 47.6 ± 1.8     | 81.9 ± 0.6            | 83.8 ± 0.9       | 79.3 ± 1.1   |
-| MSTE*       | 7.0 ± 0.7         | 51.4 ± 1.8   | 37.4 ± 2.2     | 64.1 ± 1.1            | 62.3 ± 1.1       | 58.7 ± 0.7   |
-| KG-DDI*     | 26.1 ± 0.9        | 46.7 ± 1.9   | 35.2 ± 2.5     | 79.1 ± 0.9            | 77.7 ± 1.0       | 60.2 ± 2.2   |
-| CompGCN*    | 26.8 ± 2.2        | 48.7 ± 3.0   | 37.6 ± 2.8     | 80.3 ± 3.2            | 79.4 ± 4.0       | 71.4 ± 3.1   |
-| Decagon*    | 24.3 ± 4.5        | 47.4 ± 4.9   | 35.8 ± 5.9     | 79.0 ± 2.0            | 78.5 ± 2.3       | 69.7 ± 2.4   |
-| KGNN*       | 23.1 ± 3.4        | 51.4 ± 1.9   | 40.3 ± 2.7     | 78.5 ± 0.5            | 79.8 ± 0.6       | 72.3 ± 0.7   |
-| SumGNN*     | 35.0 ± 4.3        | 48.8 ± 8.2   | 41.1 ± 4.7     | 80.3 ± 1.1            | 81.4 ± 1.0       | 73.0 ± 1.4   |
-| DeepLGF*    | 39.7 ± 2.3        | 60.7 ± 2.4   | 51.0 ± 2.6     | 81.4 ± 2.1            | 82.2 ± 2.6       | 72.8 ± 2.8   |
-| MolBridge   | 53.8 ± 5.0        | 64.4 ± 2.8   | 56.9 ± 3.7     | 66.6 ± 1.3            | 70.0 ± 1.3       | 63.5 ± 1.8   |
-
-### S2 Results (DrugBank and TWOSIDES)
-
-| Methods    | DrugBank (S2) F1 | DrugBank Acc | DrugBank Kappa | TWOSIDES (S2) PR-AUC | TWOSIDES ROC-AUC | TWOSIDES Acc |
-|------------|------------------:|-------------:|---------------:|----------------------:|-----------------:|-------------:|
-| CSMDD      | 19.8 ± 3.1        | 37.3 ± 4.8   | 22.0 ± 4.9     | 55.8 ± 4.9            | 57.0 ± 6.1       | 55.1 ± 5.2   |
-| HIN-DDI*   | 8.8 ± 1.0         | 27.6 ± 2.4   | 13.8 ± 2.4     | 64.8 ± 2.3            | 58.5 ± 1.6       | 59.8 ± 1.4   |
-| KG-DDI*    | 1.1 ± 0.1         | 32.2 ± 3.6   | --             | 53.9 ± 3.9            | 47.0 ± 5.5       | 50.0 ± 0.0   |
-| DeepLGF*   | 4.8 ± 1.9         | 31.9 ± 3.7   | 8.2 ± 2.3      | 59.4 ± 8.7            | 54.7 ± 5.9       | 54.0 ± 6.2   |
-| MolBridge  | 20.5 ± 1.3        | 40.3 ± 2.7   | 25.9 ± 3.0     | 56.5 ± 2.5            | 56.4 ± 3.9       | 54.5 ± 3.8   |
-
-Note: Methods with "*" use external knowledge graphs or heterogeneous networks.
-
-## Figure 9: t-SNE of 4 Most-Frequent Events (Deng)
-
-We provide full-resolution t-SNE visualizations for the four most-frequent DDI events on the Deng dataset. Each method shows two rows: the upper row is the initial pairwise feature encoding, and the lower row is the learned embedding.
-
-- TrimNet-DDI: [PDF](./Supplymentary/tsne/t_sne_TrimNet_duo_.pdf)
-- SSI-DDI: [PDF](./Supplymentary/tsne/t_sne_SSI_duo_.pdf)
-- MRCGNN: [PDF](./Supplymentary/tsne/t_sne_MRCGNN_duo_.pdf)
-- DSN-DDI: [PDF](./Supplymentary/tsne/t_sne_DSN_duo_.pdf)
-- MolBridge (Ours): [PDF](./Supplymentary/tsne/t_sne_2d_duo_.pdf)
-
-An index is also provided at `code/Supplymentary/tsne/frequent/` for these frequent-event t-SNE assets.
-
-## Full ATC Code Analysis (Clusters 0–6)
-
-Complete ATC codes for the representative drugs in each identified cluster.
-
-| Cluster | Drug    | ATC Code | Level 1 | Level 2 | Level 3 | Level 4 | Level 5 |
-|--------:|---------|----------|---------|---------|---------|---------|---------|
-| 0 | DB00559 | C02KX01 | C - Cardiovascular system | 02 - Antihypertensives | K - Other antihypertensives | X - Pulmonary hypertension drugs | 01 - Bosentan |
-| 1 | DB04839 | G03HA01 | G - Genito-urinary system and sex hormones | 03 - Sex hormones and modulators of the genital system | H - Antiandrogens | A - Antiandrogens, plain | 01 - Cyproterone |
-| 2 | DB09280 | R07AX30 | R - Respiratory system | 07 - Other respiratory system products | A - Other respiratory system drugs | X - Other respiratory system products | 30 - Ivacaftor/Lumacaftor |
-| 3 | DB00648 | L01XX23 | L - Antineoplastic and immunomodulating agents | 01 - Antineoplastic agents | X - Other antineoplastic agents | X - Other antineoplastic agents | 23 - Mitotane |
-| 4 | DB11901 | L02BB05 | L - Antineoplastic and immunomodulating agents | 02 - Endocrine therapy | B - Hormones and related agents | B - Antiandrogens | 05 - Enzalutamide |
-| 4 | DB08899 | L02BB04 | L - Antineoplastic and immunomodulating agents | 02 - Endocrine therapy | B - Hormones and related agents | B - Antiandrogens | 04 - Enzalutamide |
-| 5 | DB08912 | L01EC02 | L - Antineoplastic and immunomodulating agents | 01 - Antineoplastic agents | E - Protein kinase inhibitors | C - BRAF serine/threonine kinase inhibitors | 02 - Dabrafenib |
-| 6 | DB01320 | N03AB05 | N - Nervous system | 03 - Antiepileptics | A - Antiepileptics | B - Hydantoin derivatives | 05 - Phenytoin |
-| 6 | DB00564 | N03AF01 | N - Nervous system | 03 - Antiepileptics | A - Antiepileptics | F - Carboxamide derivatives | 01 - Carbamazepine |
