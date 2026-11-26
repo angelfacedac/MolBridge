@@ -1,14 +1,8 @@
 .idea/
 __pycache__/
+*.pyc
+*.pyo
 figs/
 logs/
 tmp/
-ablation_study.py
-CaseStudy.py
-cluster_analyse.py
-Long-dis.py
-paramAnalysis.py
-residual.py
-split.py
-tmp.py
-TSNE.py
+/runs/

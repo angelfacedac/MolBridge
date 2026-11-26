@@ -1,230 +1,38 @@
-# MolBridge: Atom-Level Joint Graph Refinement for Robust Drug-Drug Interaction Prediction
+# MolBridge
 
-## Introduction
+MolBridge 根据两种药物的 SMILES 预测相互作用事件类型。输入 CSV 的列名为 `smile_1,smile_2,label`，标签从 0 开始。内置 Deng、Ryu 及 inductive 划分，数据位于根目录的 `data/`。
 
-Drug combinations offer therapeutic benefits but also carry the risk of adverse drug–drug interactions (DDIs), especially under complex molecular structures. Accurate DDI event prediction requires capturing fine-grained inter-drug relationships, which are critical for modeling metabolic mechanisms such as _enzyme-mediated competition_. However, existing models typically rely on isolated drug representations and are limited to modeling atom-level cross-molecular interactions explicitly. To address this gap, we propose MolBridge, a novel atom-level joint graph refinement framework for robust DDI event prediction. MolBridge constructs a unified graph that integrates atomic structures of drug pairs, enabling direct modeling of inter-drug associations. To further capture long-range association while mitigating over-smoothing, we introduce a graph residual network that iteratively refines node features and preserves global structural context. This joint design allows MolBridge to effectively learn both local and global interaction patterns, yielding robust representations across both frequent and rare DDI types. Extensive experiments on two benchmark datasets show that MolBridge consistently outperforms state-of-the-art baselines, with at least 2.19\% and 2.49\% improvements in Macro-F1 and Macro-Recall, respectively. These results demonstrate the advantages of fine-grained graph refinement in improving the accuracy, robustness, and mechanistic interpretability of DDI prediction.
+## 模型如何计算
 
-Paper link: XXXXXXXXX
+1. RDKit 将分子转成原子特征和带自环的化学键图。75 维特征依次表示元素、度、隐式价、形式电荷、自由基电子、杂化、芳香性及氢数。每个分子保留全部原子。两种药的化学键图排列在联合矩阵的两个对角块。
+2. 原子投影到隐藏空间。多头注意力在药对的所有有效原子上计算权重。建图输入沿用原模型的 `detach()`。取各头均值作为学习图，用一个可学习的全局系数混合化学键图与学习图。
+3. 三层 MGRM 共用这张图。每层先做 `LayerNorm(H + A @ H)`，再做 `LayerNorm(Z + FFN(Z))`。将初始表示和各层输出相加，然后对真实原子求和，由分类器输出事件分数。
 
-![Framework](./Supplymentary/Framework.png)
+阅读代码可从 [模型](molbridge/model.py)、[分子和药对批处理](molbridge/data.py)、[训练与选模](molbridge/train.py) 开始。
 
+## 安装与运行
 
-## Installation and Dependencies
-
-### Requirements
-
-- Python 3.9
-- PyTorch 2.4.0 (with CUDA 11.8 support)
-- PyTorch Geometric 2.6.1
-- RDKit 2024.9.6
-- scikit-learn 1.6.1
-- numpy
-- pandas
-- tqdm
-- PyYAML
-- matplotlib (for visualization)
-
-### Setup
+需要 Python 3.10 或更新版本。在项目自己的环境中安装适合机器驱动和 GPU 的 PyTorch，再安装其余依赖。使用 RTX 5090 时选用支持 Blackwell 的构建。安装渠道可查阅 [PyTorch 官方说明](https://pytorch.org/get-started/locally/)。
 
 ```bash
-# Clone the repository
-
-# Create and activate virtual environment (optional but recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install PyTorch with CUDA support
-pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu118
-
-# Install PyTorch Geometric and its dependencies
-pip install torch-geometric==2.6.1
-pip install torch-scatter torch-sparse torch-cluster torch-spline-conv -f https://data.pyg.org/whl/torch-2.4.0+cu118.html
-
-# Install other dependencies
-pip install rdkit scikit-learn numpy pandas tqdm pyyaml matplotlib
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests
+python main.py --dataset Deng --fold 0
 ```
 
-## Usage
+默认参数在 [config.yml](config.yml)。直接执行 `python main.py` 会训练配置指定的数据集和全部折。可用 `--config path/to/config.yml` 指定配置，配置中的数据及输出目录相对于该文件。按药对在批内动态补齐，显存主要受最长药对影响，可调整 `training.batch_size`。
 
-### Model Configuration
-
-The model parameters can be configured in the `config.yml` file:
-
-```yaml
-# Model selection
-model_name: 'MolBridge'
-
-# Experiment name
-experiment_name: '3d2-num3'
-
-# Cross-validation settings
-folds: [0, 1, 2, 3, 4]
-
-# Device configuration
-device: 'cuda:0'
-
-# Training parameters
-train:
-  batch_size: 512
-  lr: 0.005
-  epochs: 500
-  loss_fn: 'CrossEntropyLoss'
-  optimizer:
-    name: 'AdamW'
-    weight_decay: 0.01
-  dropout: 0.1
-  num_workers: 4
-  seed: 42
-
-# Model architecture parameters
-model:
-  block:
-    num: 3
-    ffn:
-      hidden_dim: 2048
-  mlp:
-    hidden_dim: 256
-  attn_heads: 4
-  is_a_: true
-  is_rg: true
-  alpha: 0.0
-  is_alpha_learn: true
-  is_eye: true
-  is_joint: true
-
-# Data parameters
-data:
-  source: "Deng"
-  num_classes: 65
-  atom_dim: 75
-  atom_hid_dim: 256
-  clip_num_atom: 50
+```bash
+python main.py --dataset inductive --fold 0 --device cuda:0
+python main.py --evaluate runs/<运行目录>/fold-0/best.pt --device cpu
 ```
 
-### Data Preparation
+在原运行目录旁重评时，默认读取 `run.json` 记录的数据目录。如果旧运行还记录着 `src/data`，重评时加上 `--config config.yml` 即可使用根目录的 `data/`。跨机迁移时也可以用 `--config` 指定数据位置。权重旁有 `split_hashes.json` 时，程序会先核验全部测试文件。单独复制的权重也可通过配置指定数据，实际读取的 SHA-256 会写入 `metrics.json`。
 
-The model expects data in CSV format with drug SMILES strings and interaction labels:
+## 结果与历史版本
 
-```python
-# Dataset format example
-"""
-smile_1,smile_2,label
-CC1=CC=C(C=C1)C(=O)OCCN(C)C,CC(=O)C1=CC=C(N)C=C1,23
-CC(C)CC1=CC=C(C=C1)C(C)C(=O)O,CCN(CC)CC,7
-...
-"""
-```
+每次训练创建单独的 `runs/` 子目录。每折只用验证集 Macro-F1 选模，同分保留较早轮次。测试读取保存的 `best.pt`。Deng 和 Ryu 评估 test，inductive 分别评估 s1 和 s2。每次独立重评在权重旁新建 eval 目录。
 
-### Training the Model
+`run.json` 记录配置、实际折号、设备、PyTorch 版本和代码版本。各折目录包含切分哈希、训练曲线 CSV、最优权重、指标和逐样本预测。汇总报告逐折结果及等权平均。Macro-F1 按出现于真实或预测标签中的每个类别分别计算 F1 后取平均。
 
-```python
-# Run training with specified configuration
-python main.py
-```
-
-The training process includes:
-
-1. Loading and preprocessing molecular data
-2. Converting SMILES to graph representations
-3. Training the GRN-DDI model with cross-validation
-4. Evaluating model performance on validation and test sets
-
-### Using the Trained Model for Prediction
-
-```python
-import torch
-from src.models.mymodel import MyModel
-from src.datasets.dataloader.feature_encoding import smile_to_graph
-
-# Load trained model
-model_path = "best_model.pth"
-model = MyModel()
-model.load_state_dict(torch.load(model_path, weights_only=True))
-model.eval()
-
-# Prepare drug pair data
-def prepare_drug_pair(smile1, smile2, device):
-    # Convert SMILES to graph representations
-    # (Implementation details as per src/datasets/dataloader/collate_fn.py)
-    # ...
-    return embeds, adjs, masks, cnn_masks
-
-# Make prediction
-drug1_smiles = "CC1=CC=C(C=C1)C(=O)OCCN(C)C"
-drug2_smiles = "CC(=O)C1=CC=C(N)C=C1"
-inputs = prepare_drug_pair(drug1_smiles, drug2_smiles, device="cuda:0")
-with torch.no_grad():
-    scores, _ = model(*inputs, torch.zeros(1))
-    predicted_class = torch.argmax(scores, dim=1).item()
-    print(f"Predicted interaction class: {predicted_class}")
-```
-
-## Evaluation Metrics
-
-The model's performance is evaluated using the following metrics:
-
-1. **Accuracy**: The proportion of correctly predicted interactions.
-
-   ```
-   accuracy = correct_predictions / total_predictions
-   ```
-
-2. **Macro Precision**: The average precision across all classes.
-
-   ```
-   macro_precision = sum(precision_per_class) / num_classes
-   ```
-
-3. **Macro Recall**: The average recall across all classes.
-
-   ```
-   macro_recall = sum(recall_per_class) / num_classes
-   ```
-
-4. **Macro F1 Score**: The harmonic mean of precision and recall, averaged across all classes.
-
-   ```
-   macro_f1 = 2 * (macro_precision * macro_recall) / (macro_precision + macro_recall)
-   ```
-
-These metrics are computed for both validation and test sets during model training, with the best model checkpoint saved based on combined F1 score and accuracy performance.
-
-## Citation
-
-If you use this code in your research, please cite:
-
-```
-XXXXXXXX
-```
- 
-## Atom Feature Encoding
- 
-- Purpose: provide the complete atom feature schema for molecular graphs.
-- Feature vector per atom has 75 dimensions composed of:
-  - Atomic symbol (44): one-hot over [C, N, O, S, F, Si, P, Cl, Br, Mg, Na, Ca, Fe, As, Al, I, B, V, K, Tl, Yb, Sb, Sn, Ag, Pd, Co, Se, Ti, Zn, H, Li, Ge, Cu, Au, Ni, Cd, In, Mn, Zr, Cr, Pt, Hg, Pb, Unknown]
-  - Atomic degree (11): one-hot over [0–10]
-  - Implicit valence (7): one-hot over [0–6]
-  - Formal charge (1): integer scalar (typically −3 to +3)
-  - Radical electrons (1): integer scalar (typically 0–2)
-  - Hybridization (5): one-hot over [SP, SP2, SP3, SP3D, SP3D2]
-  - Aromaticity (1): binary indicator (0/1)
-  - Total hydrogens (5): one-hot over [0–4]
- 
-## Implementation Details
- 
-- Baselines: DeepDDI, R-GCN, GoGNN, TrimNet‑DDI, SSI‑DDI, MUFFIN, MRCGNN（reported）；DSN‑DDI、CSSE‑DDI、TIGER（re‑implemented per official configs）。
-- Data split and metrics: 5‑fold CV with 7:1:2 train/val/test；report Accuracy、Macro‑F1、Macro‑Recall、Macro‑Precision。
-- Training config: batch size 512、learning rate 0.005、seed 42、3 GFormer layers；optimizer AdamW；early stopping on validation；average over folds。
-- Environment: Intel Xeon Platinum‑8457C、NVIDIA L20 (48GB)、Ubuntu 22.04.1 LTS、PyTorch 2.4.0 (CUDA 11.8)、RDKit 2024.9.6。
- 
-## Supplementary Materials
-
-For complete details on the following topics, please refer to the **Supplementary Material PDF** document:
-- **Ablation Study**: Complete analysis of model components (w/o SCM, w/o A', w/o Ar, w/o Joint)
-- **Hyperparameter Sensitivity Analysis**: Detailed analysis of learning rate, batch size, attention heads, and SCM layers
-- **Complete Inductive Evaluation**: Full S1 and S2 results on DrugBank and TWOSIDES
-- **Additional Visualizations**: t-SNE plots for high-frequency DDI events
-- **ATC Code Analysis**: Complete therapeutic classification analysis for all clusters
-- **Long-Distance Interaction Analysis**: Performance stratification by atomic path lengths
-- **Case Studies**: Pharmacologically validated molecular interaction examples
-
+本版保留原论文的联合建图和 MGRM。完整分子、单例训练批次的 BatchNorm 处理、默认批量及选模规则与历史运行存在差异。历史配置、原实验分支、绘图及备份工具可以通过重构前的版本查看，新入口使用本版生成的权重。[重构前的代码](https://github.com/angelfacedac/MolBridge/tree/16d803098cffe7cd205412aecf859e57923a14ce)
