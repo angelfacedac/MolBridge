@@ -23,6 +23,14 @@ def write_json(path, values):
     path.write_text(json.dumps(values, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def split_hashes(folder, splits):
+    hashes = {}
+    for split in splits:
+        path = folder / f"{split}.csv"
+        hashes[split] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashes
+
+
 def make_loader(path, num_classes, cache, settings, *, shuffle=False):
     dataset = DrugPairDataset(path, cache, num_classes=num_classes)
     return DataLoader(dataset, batch_size=settings["batch_size"], shuffle=shuffle,
@@ -69,8 +77,7 @@ def evaluate_checkpoint(path, data_root, device, *, output_dir=None, cache=None)
     # 同一个入口用于训练结束时测试和日后重新评分，输出行序与原 CSV 对齐。
     saved = torch.load(path, map_location="cpu", weights_only=True)
     folder = data_root / saved["dataset"] / str(saved["fold"])
-    hashes = {s: hashlib.sha256((folder / f"{s}.csv").read_bytes()).hexdigest()
-              for s in saved["test_splits"]}
+    hashes = split_hashes(folder, saved["test_splits"])
     # 先核验全部测试文件，避免较晚的划分核验失败时留下前一划分的输出。
     hash_file = path.parent / "split_hashes.json"
     if hash_file.is_file():
@@ -110,10 +117,7 @@ def train_fold(config, dataset, fold, data_root, directory, device, cache):
     optimizer = torch.optim.AdamW(model.parameters(), lr=settings["lr"], weight_decay=settings["weight_decay"])
     best_f1, best_epoch = -1.0, 0
     directory.mkdir()
-    hashes = {}
-    for split in ["train", "val", *spec["test_splits"]]:
-        data_path = folder / f"{split}.csv"
-        hashes[split] = hashlib.sha256(data_path.read_bytes()).hexdigest()
+    hashes = split_hashes(folder, ["train", "val", *spec["test_splits"]])
     write_json(directory / "split_hashes.json", hashes)
     with (directory / "history.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream)

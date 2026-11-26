@@ -2,7 +2,6 @@
 
 import torch
 from torch import Tensor, nn
-from torch.nn import functional as F
 
 
 class GraphRefinementBlock(nn.Module):
@@ -23,18 +22,6 @@ class GraphRefinementBlock(nn.Module):
     def forward(self, atoms: Tensor, adjacency: Tensor) -> Tensor:
         atoms = self.message_norm(atoms + torch.bmm(adjacency, atoms))
         return self.ffn_norm(atoms + self.ffn(atoms))
-
-
-class PairBatchNorm(nn.BatchNorm1d):
-    """训练批次只有一个药对时，沿用运行统计量，以保留最后一个样本。"""
-
-    def forward(self, pairs: Tensor) -> Tensor:
-        if self.training and pairs.size(0) == 1:
-            return F.batch_norm(
-                pairs, self.running_mean, self.running_var,
-                self.weight, self.bias, training=False, eps=self.eps,
-            )
-        return super().forward(pairs)
 
 
 class MolBridge(nn.Module):
@@ -71,7 +58,7 @@ class MolBridge(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(hidden_dim, classifier_dim),
             nn.ReLU(),
-            PairBatchNorm(classifier_dim),
+            nn.LayerNorm(classifier_dim),
             nn.Dropout(dropout),
             nn.Linear(classifier_dim, num_classes),
         )

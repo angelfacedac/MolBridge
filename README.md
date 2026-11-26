@@ -6,7 +6,7 @@ MolBridge 根据两种药物的 SMILES 预测相互作用事件类型。输入 C
 
 1. RDKit 将分子转成原子特征和带自环的化学键图。75 维特征依次表示元素、度、隐式价、形式电荷、自由基电子、杂化、芳香性及氢数。每个分子保留全部原子。两种药的化学键图排列在联合矩阵的两个对角块。
 2. 原子投影到隐藏空间。多头注意力在药对的所有有效原子上计算权重。建图输入沿用原模型的 `detach()`。取各头均值作为学习图，用一个可学习的全局系数混合化学键图与学习图。
-3. 三层 MGRM 共用这张图。每层先做 `LayerNorm(H + A @ H)`，再做 `LayerNorm(Z + FFN(Z))`。将初始表示和各层输出相加，然后对真实原子求和，由分类器输出事件分数。
+3. 三层 MGRM 共用这张图。每层先做 `LayerNorm(H + A @ H)`，再做 `LayerNorm(Z + FFN(Z))`。将初始表示和各层输出相加，然后对真实原子求和。分类头用 LayerNorm 对每个药对的特征做归一化，尾批只有一个药对也可以训练。
 
 阅读代码可从 [模型](molbridge/model.py)、[分子和药对批处理](molbridge/data.py)、[训练与选模](molbridge/train.py) 开始。
 
@@ -27,7 +27,7 @@ python main.py --dataset inductive --fold 0 --device cuda:0
 python main.py --evaluate runs/<运行目录>/fold-0/best.pt --device cpu
 ```
 
-在原运行目录旁重评时，默认读取 `run.json` 记录的数据目录。如果旧运行还记录着 `src/data`，重评时加上 `--config config.yml` 即可使用根目录的 `data/`。跨机迁移时也可以用 `--config` 指定数据位置。权重旁有 `split_hashes.json` 时，程序会先核验全部测试文件。单独复制的权重也可通过配置指定数据，实际读取的 SHA-256 会写入 `metrics.json`。
+在原运行目录旁重评时，默认读取 `run.json` 记录的数据目录。移动数据后可以用 `--config` 指定新位置。权重旁有 `split_hashes.json` 时，程序会先核验全部测试文件。单独复制的权重也可通过配置指定数据，实际读取的 SHA-256 会写入 `metrics.json`。
 
 ## 结果与历史版本
 
@@ -35,4 +35,4 @@ python main.py --evaluate runs/<运行目录>/fold-0/best.pt --device cpu
 
 `run.json` 记录配置、实际折号、设备、PyTorch 版本和代码版本。各折目录包含切分哈希、训练曲线 CSV、最优权重、指标和逐样本预测。汇总报告逐折结果及等权平均。Macro-F1 按出现于真实或预测标签中的每个类别分别计算 F1 后取平均。
 
-本版保留原论文的联合建图和 MGRM。完整分子、单例训练批次的 BatchNorm 处理、默认批量及选模规则与历史运行存在差异。历史配置、原实验分支、绘图及备份工具可以通过重构前的版本查看，新入口使用本版生成的权重。[重构前的代码](https://github.com/angelfacedac/MolBridge/tree/16d803098cffe7cd205412aecf859e57923a14ce)
+本版保留原论文的联合建图和 MGRM。实验使用完整分子、LayerNorm 分类头和上述验证集选模规则，从头训练并用本版生成的 `best.pt` 重评。历史配置和实验分支可通过 Git 查看。[重构前的代码](https://github.com/angelfacedac/MolBridge/tree/16d803098cffe7cd205412aecf859e57923a14ce)

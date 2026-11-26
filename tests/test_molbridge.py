@@ -46,11 +46,16 @@ class MolBridgeTests(unittest.TestCase):
     def test_single_pair_training(self):
         """最后一个药对也参与训练，梯度能回到建图和原子编码。"""
         self.model.train()
+        self.assertIsInstance(self.model.classifier[2], torch.nn.LayerNorm)
         features, bonds, padding, labels = collate_pairs([self.pair])
         scores = self.model(features, bonds, padding)
         self.assertEqual(scores.shape, (1, 3))
         batch_loss(scores, labels).backward()
-        for weight in (self.model.atom_encoder[0].weight, self.model.graph_mix_logit):
+        for weight in (
+            self.model.atom_encoder[0].weight,
+            self.model.graph_mix_logit,
+            self.model.classifier[2].weight,
+        ):
             self.assertIsNotNone(weight.grad)
             self.assertTrue(torch.isfinite(weight.grad).all())
             self.assertGreater(weight.grad.abs().sum().item(), 0)
