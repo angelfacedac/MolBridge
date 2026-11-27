@@ -43,6 +43,42 @@ class MolBridgeTests(unittest.TestCase):
             _, predictions = evaluate(self.model, [alone], "cpu")
         self.assertEqual(predictions, scores.argmax(1).tolist())
 
+    def test_qk_matches_multihead_attention_weights(self):
+        """相同 Q/K 参数下，对照 PyTorch 的多头边权，覆盖补位和训练时的 dropout。"""
+        reference = torch.nn.MultiheadAttention(8, 2, dropout=0.25, batch_first=True)
+        model = self.model
+        model.edge_dropout.p = reference.dropout
+        with torch.no_grad():
+            reference.in_proj_bias.normal_()
+            model.edge_qk.weight.copy_(reference.in_proj_weight[:16])
+            model.edge_qk.bias.copy_(reference.in_proj_bias[:16])
+
+        atoms = torch.randn(2, 5, 8, requires_grad=True)
+        graph_inputs = atoms.detach()
+        padding = torch.tensor([[False, False, True, True, True], [False] * 5])
+        bonds = torch.diag_embed((~padding).float())
+        padded_edges = padding.unsqueeze(1) | padding.unsqueeze(2)
+        upstream = torch.randn_like(bonds)
+        for training in (False, True):
+            with self.subTest(training=training):
+                reference.train(training)
+                model.train(training)
+                torch.manual_seed(31)
+                _, weights = reference(graph_inputs, graph_inputs, graph_inputs, key_padding_mask=padding)
+                # 混合系数初始值为 0.5，补位行列都应为零。
+                expected = ((bonds + weights) / 2).masked_fill(padded_edges, 0)
+                torch.manual_seed(31)
+                actual = model.joint_adjacency(atoms, bonds, padding)
+                torch.testing.assert_close(actual, expected)
+
+                model.zero_grad()
+                reference.zero_grad()
+                actual.backward(upstream)
+                self.assertIsNone(atoms.grad)
+                expected.backward(upstream)
+                torch.testing.assert_close(model.edge_qk.weight.grad, reference.in_proj_weight.grad[:16])
+                torch.testing.assert_close(model.edge_qk.bias.grad, reference.in_proj_bias.grad[:16])
+
     def test_single_pair_training(self):
         """最后一个药对也参与训练，梯度能回到建图和原子编码。"""
         self.model.train()
