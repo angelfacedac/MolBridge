@@ -108,6 +108,8 @@ class MolBridge(nn.Module):
         scores = scores.masked_fill(padding_mask[:, None, None, :], float("-inf"))
         # 对有效目标原子归一化，每个头单独做 dropout，再平均得到一张学习图。
         per_head_weights = scores.softmax(dim=-1)
+        # 补位源原子的整行在 softmax 后清零，避免全 -inf 行产生 NaN。
+        per_head_weights = per_head_weights.masked_fill(padding_mask[:, None, :, None], 0)
         per_head_weights = self.edge_dropout(per_head_weights)
         edge_weights = per_head_weights.mean(dim=1)
 

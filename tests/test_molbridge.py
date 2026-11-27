@@ -77,6 +77,11 @@ class MolBridgeTests(unittest.TestCase):
         bonds = torch.diag_embed((~padding).float())
         padded_edges = padding.unsqueeze(1) | padding.unsqueeze(2)
         upstream = torch.randn_like(bonds)
+        weights_before_dropout = []
+        hook = model.edge_dropout.register_forward_pre_hook(
+            lambda _module, inputs: weights_before_dropout.append(inputs[0].detach())
+        )
+        self.addCleanup(hook.remove)
         for training in (False, True):
             with self.subTest(training=training):
                 reference.train(training)
@@ -88,6 +93,9 @@ class MolBridgeTests(unittest.TestCase):
                 torch.manual_seed(31)
                 actual = model.joint_adjacency(atoms, bonds, padding)
                 torch.testing.assert_close(actual, expected)
+                weights = weights_before_dropout[-1]
+                self.assertTrue(torch.isfinite(weights).all())
+                self.assertEqual(weights.masked_select(padding[:, None, :, None]).count_nonzero().item(), 0)
 
                 model.zero_grad()
                 reference.zero_grad()
