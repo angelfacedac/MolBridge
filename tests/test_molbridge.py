@@ -5,7 +5,7 @@ import unittest
 import torch
 
 from molbridge.data import collate_pairs, molecule_graph
-from molbridge.model import MolBridge
+from molbridge.model import MolBridge, assemble_pair
 from molbridge.train import batch_loss, evaluate
 
 
@@ -19,7 +19,8 @@ class MolBridgeTests(unittest.TestCase):
     def test_chemical_bonds_and_full_molecule(self):
         """一个含 60 个原子的分子应完整保留，药物之间的化学键块应为零。"""
         long_pair = (molecule_graph("C" * 60), molecule_graph("O"), 0)
-        features, bonds, padding, labels = collate_pairs([self.pair, long_pair])
+        drug1, drug2, labels = collate_pairs([self.pair, long_pair])
+        features, bonds, padding = assemble_pair(drug1, drug2)
 
         self.assertEqual(features.shape, (2, 61, 75))
         self.assertEqual((~padding).sum(1).tolist(), [3, 61])
@@ -31,14 +32,31 @@ class MolBridgeTests(unittest.TestCase):
         self.assertEqual(bonds[1, :60, 60].count_nonzero().item(), 0)
         self.assertEqual(bonds[1, 60, :60].count_nonzero().item(), 0)
 
+    def test_drug_columns_and_pair_alignment(self):
+        """左右最长分子来自不同行时，仍须按行配对并紧凑排列。"""
+        small, large = molecule_graph("N"), molecule_graph("CCCO")
+        drug1, drug2, labels = collate_pairs([(small, large, 1), (large, small, 2)])
+        self.assertEqual(drug1.sizes, (1, 4))
+        self.assertEqual(drug2.sizes, (4, 1))
+        self.assertEqual(labels.tolist(), [1, 2])
+        features, bonds, padding = assemble_pair(drug1, drug2)
+        self.assertEqual(features.shape, (2, 5, 75))
+        self.assertFalse(padding.any())
+        for i, (left, right) in enumerate([(small, large), (large, small)]):
+            torch.testing.assert_close(features[i], torch.cat([left.features, right.features]))
+            torch.testing.assert_close(bonds[i], torch.block_diag(left.bonds, right.bonds))
+        with self.assertRaisesRegex(ValueError, "数量"):
+            self.model(small, drug2)
+
     def test_other_pair_padding_does_not_change_prediction(self):
         """同一对药单独评估或和更长的药对一起评估，分数应一致。"""
         self.model.eval()
         alone = collate_pairs([self.pair])
         mixed = collate_pairs([self.pair, (molecule_graph("CCCO"), molecule_graph("CN"), 0)])
         with torch.inference_mode():
-            scores = self.model(*alone[:3])
-            padded_scores = self.model(*mixed[:3])
+            scores = self.model(*self.pair[:2])
+            torch.testing.assert_close(scores, self.model(*alone[:2]))
+            padded_scores = self.model(*mixed[:2])
             torch.testing.assert_close(scores[0], padded_scores[0], rtol=1e-5, atol=1e-5)
             _, predictions = evaluate(self.model, [alone], "cpu")
         self.assertEqual(predictions, scores.argmax(1).tolist())
@@ -83,8 +101,8 @@ class MolBridgeTests(unittest.TestCase):
         """最后一个药对也参与训练，梯度能回到建图和原子编码。"""
         self.model.train()
         self.assertIsInstance(self.model.classifier[2], torch.nn.LayerNorm)
-        features, bonds, padding, labels = collate_pairs([self.pair])
-        scores = self.model(features, bonds, padding)
+        drug1, drug2, labels = collate_pairs([self.pair])
+        scores = self.model(drug1, drug2)
         self.assertEqual(scores.shape, (1, 3))
         batch_loss(scores, labels).backward()
         for weight in (

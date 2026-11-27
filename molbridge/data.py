@@ -1,4 +1,4 @@
-"""读入药对 CSV，把两个完整分子组装成一张联合图。"""
+"""读取药对 CSV，分别生成两种药的分子图和事件标签。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ from typing import NamedTuple, Sequence
 
 import torch
 from rdkit import Chem
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Dataset
+
+from .graph import MoleculeBatch, MoleculeGraph
 
 
 # 顺序是论文所用 75 维原子特征的一部分，改变顺序会改变模型输入。
@@ -50,11 +52,6 @@ def _atom_features(atom: Chem.Atom) -> list[int]:
         atom.GetIsAromatic(),
         *_one_hot(atom.GetTotalNumHs(), range(5)),
     ]
-
-
-class MoleculeGraph(NamedTuple):
-    features: torch.Tensor
-    bonds: torch.Tensor
 
 
 def molecule_graph(smiles: str) -> MoleculeGraph:
@@ -133,23 +130,14 @@ class DrugPairDataset(Dataset):
 
 
 def collate_pairs(samples: list[tuple[MoleculeGraph, MoleculeGraph, int]]) -> tuple[
-    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
+    MoleculeBatch, MoleculeBatch, torch.Tensor
 ]:
-    """A、B 的原子紧邻排列，在每个药对末尾补齐。padding_mask 的 True 表示填充位。"""
-    width = max(len(first.features) + len(second.features) for first, second, _ in samples)
-    batch_size = len(samples)
-    features = torch.zeros(batch_size, width, ATOM_DIM, dtype=torch.float32)
-    bonds = torch.zeros(batch_size, width, width, dtype=torch.float32)
-    padding_mask = torch.ones(batch_size, width, dtype=torch.bool)
-    targets = torch.empty(batch_size, dtype=torch.long)
-    for index, (first, second, label) in enumerate(samples):
-        start = 0
-        for graph in (first, second):
-            end = start + len(graph.features)
-            features[index, start:end] = graph.features
-            # 两块对角子矩阵各自包含化学键和自环，跨分子权重由模型学习。
-            bonds[index, start:end, start:end] = graph.bonds
-            start = end
-        padding_mask[index, :start] = False
-        targets[index] = label
-    return features, bonds, padding_mask, targets
+    """两列分子分别打包。两列的同一行组成一个药对，对应同一行标签。"""
+    first, second, labels = zip(*samples)
+    return MoleculeBatch.from_graphs(first), MoleculeBatch.from_graphs(second), torch.tensor(labels)
+
+
+def make_loader(path, num_classes, cache, settings, *, shuffle=False):
+    dataset = DrugPairDataset(path, cache, num_classes=num_classes)
+    return DataLoader(dataset, batch_size=settings["batch_size"], shuffle=shuffle,
+                      num_workers=settings["num_workers"], collate_fn=collate_pairs)

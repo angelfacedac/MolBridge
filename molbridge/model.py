@@ -5,6 +5,31 @@ import math
 import torch
 from torch import Tensor, nn
 
+from .graph import MoleculeBatch, MoleculeGraph
+
+
+def assemble_pair(drug1: MoleculeBatch, drug2: MoleculeBatch) -> tuple[Tensor, Tensor, Tensor]:
+    """在每个药对内部将两种药紧邻摆放，只在药对末尾补齐。"""
+    if len(drug1.sizes) != len(drug2.sizes):
+        raise ValueError("药对两侧的分子数量必须相同")
+    pair_sizes = [a + b for a, b in zip(drug1.sizes, drug2.sizes)]
+    batch_size, width = len(pair_sizes), max(pair_sizes)
+    features = drug1.features.new_zeros((batch_size, width, drug1.features.size(-1)))
+    bonds = drug1.bonds.new_zeros((batch_size, width, width))
+
+    # 两个分子的化学键分别放在对角块，跨分子位置留给后续的 Q/K 建图。
+    first_width = drug1.features.size(1)
+    features[:, :first_width] = drug1.features
+    bonds[:, :first_width, :first_width] = drug1.bonds
+    for i, (start, size) in enumerate(zip(drug1.sizes, drug2.sizes)):
+        end = start + size
+        features[i, start:end] = drug2.features[i, :size]
+        bonds[i, start:end, start:end] = drug2.bonds[i, :size, :size]
+
+    lengths = torch.tensor(pair_sizes, device=features.device)
+    padding = torch.arange(width, device=features.device)[None, :] >= lengths[:, None]
+    return features, bonds, padding
+
 
 class GraphRefinementBlock(nn.Module):
     """在同一张联合图上传递消息，再用前馈网络更新每个原子。"""
@@ -91,12 +116,15 @@ class MolBridge(nn.Module):
         padded_edges = padding_mask.unsqueeze(1) | padding_mask.unsqueeze(2)
         return adjacency.masked_fill(padded_edges, 0)
 
-    def forward(self, atom_features: Tensor, bonds: Tensor, padding_mask: Tensor) -> Tensor:
-        """输入为配对原子特征 [B,N,F]、化学键图 [B,N,N] 和填充标记 [B,N]。
-
-        N 为批内补齐后的联合原子数。两种药的化学键各占一个对角块。
-        padding_mask 为布尔张量，True 表示填充位置。
-        """
+    def forward(
+        self, drug1: MoleculeGraph | MoleculeBatch, drug2: MoleculeGraph | MoleculeBatch
+    ) -> Tensor:
+        """输入单个药对或两列一一对应的分子，返回 [药对数, 类别数] 的分数。"""
+        if isinstance(drug1, MoleculeGraph):
+            drug1 = MoleculeBatch.from_graphs([drug1])
+        if isinstance(drug2, MoleculeGraph):
+            drug2 = MoleculeBatch.from_graphs([drug2])
+        atom_features, bonds, padding_mask = assemble_pair(drug1, drug2)
         atoms = self.atom_encoder(atom_features)
         adjacency = self.joint_adjacency(atoms, bonds, padding_mask)
 

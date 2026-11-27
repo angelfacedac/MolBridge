@@ -12,9 +12,8 @@ from tempfile import mkdtemp
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 
-from .data import DrugPairDataset, collate_pairs
+from .data import make_loader
 from .metrics import classification_metrics, write_predictions
 from .model import MolBridge
 
@@ -31,12 +30,6 @@ def split_hashes(folder, splits):
     return hashes
 
 
-def make_loader(path, num_classes, cache, settings, *, shuffle=False):
-    dataset = DrugPairDataset(path, cache, num_classes=num_classes)
-    return DataLoader(dataset, batch_size=settings["batch_size"], shuffle=shuffle,
-                      num_workers=settings["num_workers"], collate_fn=collate_pairs)
-
-
 def batch_loss(scores, labels):
     if scores.shape[1] == 1:
         return F.binary_cross_entropy_with_logits(scores[:, 0], labels.float())
@@ -46,10 +39,11 @@ def batch_loss(scores, labels):
 def train_epoch(model, loader, optimizer, device):
     model.train()
     total_loss = 0.0
-    for batch in loader:
-        features, bonds, padding, labels = (tensor.to(device) for tensor in batch)
+    for drug1, drug2, labels in loader:
+        drug1, drug2, labels = drug1.to(device), drug2.to(device), labels.to(device)
         optimizer.zero_grad(set_to_none=True)
-        loss = batch_loss(model(features, bonds, padding), labels)
+        scores = model(drug1, drug2)
+        loss = batch_loss(scores, labels)
         loss.backward()
         optimizer.step()
         total_loss += loss.item() * len(labels)
@@ -61,9 +55,9 @@ def evaluate(model, loader, device):
     model.eval()
     predictions, labels = [], []
     total_loss = 0.0
-    for batch in loader:
-        features, bonds, padding, target = (tensor.to(device) for tensor in batch)
-        scores = model(features, bonds, padding)
+    for drug1, drug2, target in loader:
+        drug1, drug2, target = drug1.to(device), drug2.to(device), target.to(device)
+        scores = model(drug1, drug2)
         total_loss += batch_loss(scores, target).item() * len(target)
         predicted = (scores[:, 0] > 0).long() if scores.shape[1] == 1 else scores.argmax(dim=1)
         predictions.extend(predicted.cpu().tolist())
