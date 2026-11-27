@@ -5,7 +5,7 @@ import math
 import torch
 from torch import Tensor, nn
 
-from method.data.molecule import ATOM_DIM, MoleculeBatch, MoleculeGraph
+from .data.molecule import ATOM_DIM, MoleculeBatch, MoleculeGraph
 
 
 def assemble_pair(drug1: MoleculeBatch, drug2: MoleculeBatch) -> tuple[Tensor, Tensor, Tensor]:

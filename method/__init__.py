@@ -1,1 +1,1 @@
-"""MolBridge 方法相关的 Python 包。"""
+"""MolBridge 的数据处理、模型、训练与评估。"""

@@ -13,7 +13,7 @@ from unittest.mock import patch
 import torch
 
 import main
-from molbridge.model import MolBridge
+from method.model import MolBridge
 
 
 class EvaluationDataTests(unittest.TestCase):

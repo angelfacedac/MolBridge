@@ -5,8 +5,8 @@ import unittest
 import torch
 
 from method.data import collate_pairs, molecule_graph
-from molbridge.model import MolBridge, assemble_pair
-from molbridge.train import batch_loss, evaluate
+from method.model import MolBridge, assemble_pair
+from method.train import batch_loss, evaluate
 
 
 class MolBridgeTests(unittest.TestCase):

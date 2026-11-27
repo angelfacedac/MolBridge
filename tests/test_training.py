@@ -14,7 +14,7 @@ import torch
 import yaml
 
 from main import main
-from molbridge.train import train_epoch
+from method.train import train_epoch
 
 
 def read_rows(path):
@@ -71,7 +71,7 @@ class TrainingPipelineTest(unittest.TestCase):
             command = ["main.py", "--config", str(config_path), "--device", "cpu"]
 
             with patch.object(sys, "argv", [*command, "--fold", "0"]), redirect_stdout(io.StringIO()):
-                with patch("molbridge.train.train_epoch", side_effect=train_with_distinct_predictions):
+                with patch("method.train.train_epoch", side_effect=train_with_distinct_predictions):
                     main()
 
             output, = (root / "runs").glob("*/fold-0")

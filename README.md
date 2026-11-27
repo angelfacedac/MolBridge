@@ -8,16 +8,16 @@ MolBridge 根据两种药物的 SMILES 预测相互作用事件类型。输入 C
 2. `model(drug1, drug2)` 接收两个单分子图或两个分子批次，在模型内将化学键图排成两个对角块，再把原子投影到隐藏空间。将每个原子投影成 Q 和 K，各头通过缩放点积和 softmax 得到它对各有效目标原子的边权。建图输入沿用原模型的 `detach()`。取各头均值作为学习图，用一个可学习的全局系数混合化学键图与学习图。
 3. 三层 MGRM 共用这张图。每层先做 `LayerNorm(H + A @ H)`，再做 `LayerNorm(Z + FFN(Z))`。将初始表示和各层输出相加，然后对真实原子求和。分类头用 LayerNorm 对每个药对的特征做归一化，尾批只有一个药对也可以训练。
 
-代码按输入到预测的顺序组织。根目录的 `data/` 存放实验数据，`method/data/` 存放处理这些数据的 Python 代码。
+源码集中在 `method/`。根目录的 `data/` 存放实验数据，`method/data/` 提供原子编码、分子图和数据加载代码。
 
 | 要改什么 | 对应文件 |
 |---|---|
 | 75 维原子特征的字段与编码 | [features.py](method/data/features.py) |
 | 从 SMILES 构造单分子图、将一列分子打包 | [molecule.py](method/data/molecule.py) |
 | 读取药对 CSV、缓存分子、组装数据加载器 | [dataset.py](method/data/dataset.py) |
-| 将两种药组成联合图、传播消息并分类 | [model.py](molbridge/model.py) |
-| 训练、选模与重评 | [train.py](molbridge/train.py) |
-| 计算评价指标、保存逐药对预测 | [metrics.py](molbridge/metrics.py) |
+| 将两种药组成联合图、传播消息并分类 | [model.py](method/model.py) |
+| 训练、选模与重评 | [train.py](method/train.py) |
+| 计算评价指标、保存逐药对预测 | [metrics.py](method/metrics.py) |
 
 ## 安装与运行
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 import yaml
 
-from molbridge.train import evaluate_checkpoint, train
+from method.train import evaluate_checkpoint, train
 
 
 def main():

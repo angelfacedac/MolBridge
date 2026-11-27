@@ -13,7 +13,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from method.data import make_loader
+from .data import make_loader
 from .metrics import classification_metrics, write_predictions
 from .model import MolBridge
 
