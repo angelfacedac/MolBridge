@@ -4,7 +4,7 @@ import unittest
 
 import torch
 
-from molbridge.data import collate_pairs, molecule_graph
+from method.data import collate_pairs, molecule_graph
 from molbridge.model import MolBridge, assemble_pair
 from molbridge.train import batch_loss, evaluate
 

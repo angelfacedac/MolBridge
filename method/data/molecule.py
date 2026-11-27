@@ -6,6 +6,9 @@ import torch
 from torch import Tensor
 
 
+ATOM_DIM = 75
+
+
 class MoleculeGraph(NamedTuple):
     """一个分子的原子特征 [N,F] 和化学键邻接矩阵 [N,N]。"""
 
@@ -33,3 +36,23 @@ class MoleculeBatch(NamedTuple):
 
     def to(self, device: torch.device) -> "MoleculeBatch":
         return MoleculeBatch(self.features.to(device), self.bonds.to(device), self.sizes)
+
+
+def molecule_graph(smiles: str) -> MoleculeGraph:
+    """生成全部原子的特征和带自环的化学键图。"""
+    # 只有从 SMILES 构图时才需要化学工具，模型可以直接接收已有的张量。
+    from rdkit import Chem
+    from .features import atom_features
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None or mol.GetNumAtoms() == 0:
+        raise ValueError("无法解析为含原子的分子")
+    # 与公开代码保持相同的规范化、编号顺序，便于用旧权重核对编码。
+    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol, canonical=True))
+    if mol is None:
+        raise ValueError("规范化后的分子无法解析")
+    mol = Chem.RenumberAtoms(mol, list(Chem.CanonicalRankAtoms(mol)))
+    features = torch.tensor([atom_features(atom) for atom in mol.GetAtoms()], dtype=torch.float32)
+    bonds = torch.tensor(Chem.GetAdjacencyMatrix(mol), dtype=torch.float32)
+    bonds.fill_diagonal_(1)
+    return MoleculeGraph(features, bonds)

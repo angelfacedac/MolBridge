@@ -5,7 +5,7 @@ import math
 import torch
 from torch import Tensor, nn
 
-from .graph import MoleculeBatch, MoleculeGraph
+from method.data.molecule import ATOM_DIM, MoleculeBatch, MoleculeGraph
 
 
 def assemble_pair(drug1: MoleculeBatch, drug2: MoleculeBatch) -> tuple[Tensor, Tensor, Tensor]:
@@ -58,7 +58,7 @@ class MolBridge(nn.Module):
     def __init__(
         self,
         num_classes: int,
-        atom_dim: int = 75,
+        atom_dim: int = ATOM_DIM,
         hidden_dim: int = 256,
         ffn_dim: int = 2048,
         num_layers: int = 3,

@@ -1,73 +1,15 @@
-"""读取药对 CSV，分别生成两种药的分子图和事件标签。"""
+"""读取药对 CSV，缓存单分子图，并将两列药物分别打包。"""
 
 from __future__ import annotations
 
 import csv
 from pathlib import Path
-from typing import NamedTuple, Sequence
+from typing import NamedTuple
 
 import torch
-from rdkit import Chem
 from torch.utils.data import DataLoader, Dataset
 
-from .graph import MoleculeBatch, MoleculeGraph
-
-
-# 顺序是论文所用 75 维原子特征的一部分，改变顺序会改变模型输入。
-ELEMENTS = (
-    "C", "N", "O", "S", "F", "Si", "P", "Cl", "Br", "Mg", "Na", "Ca",
-    "Fe", "As", "Al", "I", "B", "V", "K", "Tl", "Yb", "Sb", "Sn", "Ag",
-    "Pd", "Co", "Se", "Ti", "Zn", "H", "Li", "Ge", "Cu", "Au", "Ni", "Cd",
-    "In", "Mn", "Zr", "Cr", "Pt", "Hg", "Pb", "Unknown",
-)
-HYBRIDIZATIONS = (
-    Chem.HybridizationType.SP, Chem.HybridizationType.SP2, Chem.HybridizationType.SP3,
-    Chem.HybridizationType.SP3D, Chem.HybridizationType.SP3D2,
-)
-ATOM_DIM = 75
-
-
-def _one_hot(value, choices: Sequence) -> list[bool]:
-    """沿用原编码表约定，未列出的取值落入最后一栏。"""
-    if value not in choices:
-        value = choices[-1]
-    return [value == choice for choice in choices]
-
-
-def _atom_features(atom: Chem.Atom) -> list[int]:
-    degree = atom.GetDegree()
-    if degree > 10:
-        raise ValueError(f"原子序号 {atom.GetIdx()} 的邻居数 {degree} 超出编码范围 0–10")
-    if hasattr(Chem, "ValenceType"):
-        valence = atom.GetValence(Chem.ValenceType.IMPLICIT)
-    else:
-        valence = atom.GetImplicitValence()
-
-    return [
-        *_one_hot(atom.GetSymbol(), ELEMENTS),
-        *_one_hot(degree, range(11)),
-        *_one_hot(valence, range(7)),
-        atom.GetFormalCharge(), atom.GetNumRadicalElectrons(),
-        *_one_hot(atom.GetHybridization(), HYBRIDIZATIONS),
-        atom.GetIsAromatic(),
-        *_one_hot(atom.GetTotalNumHs(), range(5)),
-    ]
-
-
-def molecule_graph(smiles: str) -> MoleculeGraph:
-    """生成全部原子的特征和带自环的化学键图。"""
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None or mol.GetNumAtoms() == 0:
-        raise ValueError("无法解析为含原子的分子")
-    # 与公开代码保持相同的规范化、编号顺序，便于用旧权重核对编码。
-    mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol, canonical=True))
-    if mol is None:
-        raise ValueError("规范化后的分子无法解析")
-    mol = Chem.RenumberAtoms(mol, list(Chem.CanonicalRankAtoms(mol)))
-    features = torch.tensor([_atom_features(atom) for atom in mol.GetAtoms()], dtype=torch.float32)
-    bonds = torch.tensor(Chem.GetAdjacencyMatrix(mol), dtype=torch.float32)
-    bonds.fill_diagonal_(1)
-    return MoleculeGraph(features, bonds)
+from .molecule import MoleculeBatch, MoleculeGraph, molecule_graph
 
 
 class DrugPair(NamedTuple):
